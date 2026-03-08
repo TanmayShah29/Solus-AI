@@ -6,6 +6,9 @@ import { env } from "@/lib/env";
 
 import { buildSystemPrompt } from "@/lib/memory/context-assembler";
 import { inngest } from "@/inngest/client";
+import { tool } from "ai";
+import { z } from "zod";
+import { executeTool } from "@/lib/tools/router";
 
 // Allow up to 30 s on Vercel (streaming responses need more than the 10 s default).
 export const maxDuration = 30;
@@ -77,6 +80,55 @@ export const POST = traceable(
             const { messages } = await req.json();
             const data = new StreamData();
 
+            const tools = {
+                web_search: tool({
+                    description: "Search the web for current information, recent events, news, facts, or anything not in memory. Use this whenever the user asks about something that requires up-to-date information.",
+                    parameters: z.object({
+                        query: z.string().describe("The search query"),
+                        max_results: z.number().optional().describe("Number of results, default 5"),
+                    }),
+                    execute: async ({ query, max_results }) => {
+                        data.append({ type: "thinking", step: `Searching the web for "${query}"...` });
+                        return executeTool("web-search", { query, max_results });
+                    },
+                }),
+
+                read_url: tool({
+                    description: "Fetch and read the content of any URL. Use when the user shares a link or when web search results need deeper reading.",
+                    parameters: z.object({
+                        url: z.string().describe("The URL to read"),
+                        max_length: z.number().optional().describe("Max characters to extract, default 3000"),
+                    }),
+                    execute: async ({ url, max_length }) => {
+                        data.append({ type: "thinking", step: `Reading ${url}...` });
+                        return executeTool("read-url", { url, max_length });
+                    },
+                }),
+
+                weather: tool({
+                    description: "Get current weather and 3-day forecast for any city. Use when the user asks about weather.",
+                    parameters: z.object({
+                        city: z.string().describe("City name e.g. Mumbai, London, New York"),
+                    }),
+                    execute: async ({ city }) => {
+                        data.append({ type: "thinking", step: `Checking weather in ${city}...` });
+                        return executeTool("weather", { city });
+                    },
+                }),
+
+                news_headlines: tool({
+                    description: "Get latest news headlines on any topic. Use when the user asks about current events, news, or wants to know what is happening in a specific area.",
+                    parameters: z.object({
+                        topic: z.string().describe("News topic e.g. AI, cricket, India, technology"),
+                        max_results: z.number().optional().describe("Number of articles, default 5"),
+                    }),
+                    execute: async ({ topic, max_results }) => {
+                        data.append({ type: "thinking", step: `Finding latest news about "${topic}"...` });
+                        return executeTool("news-headlines", { topic, max_results });
+                    },
+                }),
+            };
+
             // Get the latest user message to use as the memory query
             const latestMessage = messages[messages.length - 1]?.content ?? "";
 
@@ -92,8 +144,9 @@ export const POST = traceable(
             const result = streamText({
                 model: groq(REASONING_MODEL),
                 system: systemPrompt,
-
                 messages,
+                tools,
+                maxSteps: 5,
                 onFinish: async ({ text, usage }) => {
                     const supabase = await createClient();
                     const session_id = crypto.randomUUID(); // temporary until we add proper sessions
