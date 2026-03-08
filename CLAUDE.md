@@ -37,7 +37,6 @@ Solus is a personal AI agent OS built for **Tanmay Shah** — a 6th semester Com
 | Groq | LLM inference (Llama 3.3 70B + 3.1 8B) | Free |
 | Inngest | Background jobs + durable workflows + HITL | Free |
 | Upstash Redis | Caching + rate limiting + event bus | Free |
-| Cloudflare Workers | Tool execution sandbox (one Worker per tool) | Free |
 | Tavily | Web search API | Free |
 | Telegram Bot API | Mobile channel | Free |
 | Alexa Skills Kit | Voice channel | Free |
@@ -53,7 +52,7 @@ Solus is a personal AI agent OS built for **Tanmay Shah** — a 6th semester Com
 Layer 1: Channel Layer      → Vercel API Routes (normalises all input to standard message object)
 Layer 2: Governance Layer   → Vercel Edge Middleware (token budget, rate limits)
 Layer 3: Kernel Layer       → Vercel API Routes + Groq (ReAct loop, tool routing)
-Layer 4: Tool Layer         → Cloudflare Workers (isolated tool execution)
+Layer 4: Tool Layer         → Next.js API Routes (isolated tool execution at /api/tools/[toolName])
 Layer 5: Memory Layer       → Supabase PostgreSQL + pgvector (all persistent state)
 ```
 
@@ -84,7 +83,7 @@ These are final. Do not use alternatives.
 | Thinking indicators | `StreamData.append({ type: 'thinking', step: '...' })` — `useChat` data array on frontend |
 | LLM client | `@ai-sdk/groq` with `createGroq()` |
 | Tool definitions | `tool()` helper from `ai` + Zod schemas |
-| Parallel tool dispatch | `Promise.all()` over Cloudflare Worker fetch calls |
+| Parallel tool dispatch | `Promise.all()` over fetch calls to `/api/tools/[toolName]` routes |
 | LangSmith tracing | `traceable()` wrapping route handlers and Inngest steps — NOT `wrapOpenAI()` |
 | Embedding model | `all-MiniLM-L6-v2` via Supabase Edge Function (`@xenova/transformers`) |
 | Vector dimensions | `vector(384)` — all pgvector columns |
@@ -143,7 +142,7 @@ solus/
 │   │   │   └── context-assembler.ts   ← builds Living Context Block
 │   │   ├── tools/
 │   │   │   ├── definitions.ts         ← tool() + Zod schemas
-│   │   │   └── router.ts              ← Promise.all() dispatch to Workers
+│   │   │   └── router.ts              ← Promise.all() dispatch to local API routes
 │   │   ├── kernel/
 │   │   │   ├── standard.ts            ← full ReAct path (web + Telegram)
 │   │   │   └── fast-track.ts          ← single-call path (Alexa)
@@ -160,10 +159,7 @@ solus/
 │   └── functions/
 │       └── embed/
 │           └── index.ts               ← Deno Edge Function (all-MiniLM-L6-v2)
-└── workers/                           ← Cloudflare Workers (one per tool)
-    ├── web-search/
-    └── read-url/
-```
+└── README.md
 
 ---
 
@@ -276,7 +272,7 @@ id           uuid PRIMARY KEY DEFAULT gen_random_uuid()
 name         text UNIQUE NOT NULL
 description  text NOT NULL
 schema       jsonb NOT NULL
-worker_url   text NOT NULL
+worker_url   text NOT NULL   -- Next.js API route path e.g. /api/tools/web-search
 category     text
 enabled      boolean DEFAULT true
 auto_approve boolean DEFAULT false
@@ -445,8 +441,9 @@ const toolDefinitions = {
 const results = await Promise.all(
   toolCalls.map(async ({ toolName, args }) => {
     const tool = await getToolFromRegistry(toolName)
-    const res = await fetch(tool.worker_url, {
+    const res = await fetch(`${env.NEXT_PUBLIC_APP_URL}${tool.worker_url}`, {
       method: 'POST',
+      headers: { 'Authorization': `Bearer ${env.API_SECRET_TOKEN}` },
       body: JSON.stringify({ tool_name: toolName, args, user_id: 'tanmay' })
     })
     return res.json()
@@ -504,12 +501,12 @@ export const POST = traceable(
 | 1 | Foundation: chat UI, Groq streaming, Supabase logging, LangSmith | `/api/chat/route.ts`, `ChatInterface.tsx`, `ThinkingIndicator.tsx` |
 | 2 | Memory: embeddings, RAG, context assembler | `embed.ts`, `retrieve.ts`, `context-assembler.ts`, Supabase Edge Function |
 | 3 | Task Engine: Inngest workflows, HITL, Redis cache | `inngest/functions/`, `/api/hitl/approve/route.ts` |
-| 4 | Core Tools: web_search, read_url, extract_entities Workers | `workers/web-search/`, `tools/router.ts` |
+| 4 | Core Tools: web_search, read_url, extract_entities | `/api/tools/`, `tools/router.ts` |
 | 5 | Reflection: Judge pattern, entity resolution, people graph | `inngest/functions/reflection.ts` |
 | 6 | Autonomy: morning brief, goal tracker, living context block | `inngest/functions/morning-brief.ts`, GitHub Actions cron |
 | 7 | Channels: Telegram bot, Alexa fast-track skill | `channels/telegram/route.ts`, `channels/alexa/route.ts`, `kernel/fast-track.ts` |
-| 8 | Productivity: Google Calendar + Gmail OAuth tools | `workers/google-calendar/`, `oauth_tokens` table |
-| 9 | Automation: news monitor, email automation, file summary | `workers/news-monitor/` |
+| 8 | Productivity: Google Calendar + Gmail OAuth tools | `/api/tools/google-calendar/`, `oauth_tokens` table |
+| 9 | Automation: news monitor, email automation, file summary | `/api/tools/news-monitor/` |
 | 10 | Polish: README, demo video, observability dashboard | `/traces` page, LangSmith integration |
 
 **Currently on: Phase 1.**

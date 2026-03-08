@@ -1,6 +1,7 @@
 import { embedText } from "@/lib/memory/embed";
 import { createClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
+import { invalidateContextCache } from "@/lib/memory/context-assembler";
 
 export type Memory = {
     content: string;
@@ -53,6 +54,9 @@ export async function storeMemory(
 
         if (error) {
             console.error("Failed to insert memory row:", error);
+        } else {
+            // Invalidate context cache so next request gets fresh data
+            await invalidateContextCache();
         }
     } catch (error) {
         console.error("Store memory failed during embedding or client setup:", error);

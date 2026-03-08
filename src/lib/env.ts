@@ -57,7 +57,7 @@ const envSchema = z.object({
         })
         .default("true"),
     LANGCHAIN_PROJECT: z.string().min(1).default("solus"),
-    MORNING_BRIEF_CRON: z.string().min(1).default("30 2 * * *"),
+    MORNING_BRIEF_CRON: z.string().min(1).default("30 0 * * *"),
 
     // ── Future phases — optional, will not throw ─────────────────────────────
 
@@ -68,10 +68,6 @@ const envSchema = z.object({
     // Upstash Redis (Phase 2)
     UPSTASH_REDIS_REST_URL: z.string().url().optional().or(z.literal("")),
     UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
-
-    // Cloudflare Workers (Phase 3)
-    CLOUDFLARE_ACCOUNT_ID: z.string().optional(),
-    CLOUDFLARE_API_TOKEN: z.string().optional(),
 
     // Tavily (Phase 4)
     TAVILY_API_KEY: z.string().optional(),
