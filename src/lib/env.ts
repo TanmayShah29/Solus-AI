@@ -57,6 +57,7 @@ const envSchema = z.object({
         })
         .default("true"),
     LANGCHAIN_PROJECT: z.string().min(1).default("solus"),
+    NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
     MORNING_BRIEF_CRON: z.string().min(1).default("30 0 * * *"),
 
     // ── Future phases — optional, will not throw ─────────────────────────────
