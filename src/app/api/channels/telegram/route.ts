@@ -71,12 +71,16 @@ export async function POST(req: Request) {
         const fileData = await fileRes.json()
         const filePath = fileData.result.file_path
 
+        console.log('Voice file path:', filePath)
+
         // Download the audio file
         const audioRes = await fetch(
             `https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${filePath}`
         )
         const audioBuffer = await audioRes.arrayBuffer()
-        const audioBlob = new Blob([audioBuffer], { type: 'audio/ogg' })
+        console.log('Audio buffer size:', audioBuffer.byteLength)
+
+        const audioBlob = new Blob([audioBuffer], { type: 'audio/ogg; codecs=opus' })
 
         // Transcribe with Groq Whisper
         const formData = new FormData()
@@ -91,6 +95,8 @@ export async function POST(req: Request) {
         })
 
         if (!transcribeRes.ok) {
+            const errorBody = await transcribeRes.text()
+            console.error('Groq transcription failed:', transcribeRes.status, errorBody)
             await sendTelegramMessage(chatId, "Couldn't transcribe your voice message. Try again.")
             return Response.json({ ok: true })
         }
