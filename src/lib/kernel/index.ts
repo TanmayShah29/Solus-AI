@@ -259,7 +259,7 @@ export function getSolusTools(data?: any) {
         }),
 
         google_calendar: tool({
-            description: "Read, create, and check Tanmay's Google Calendar. Use for: checking schedule, creating events, finding free time, answering 'what do I have today/this week'. Actions: list_events, create_event, check_free_busy.",
+            description: "Read, create, and check Tanmay's Google Calendar. Use for: checking schedule, creating events, finding free time, answering 'what do I have today/this week'. Always use current real-world dates. Today is " + new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) + ". Never guess or hallucinate dates. Actions: list_events, create_event, check_free_busy.",
             parameters: z.object({
                 action: z.enum(['list_events', 'create_event', 'check_free_busy']),
                 time_min: z.string().optional().describe('ISO 8601 datetime — start of range'),

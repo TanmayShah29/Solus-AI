@@ -15,8 +15,13 @@ export const POST = traceable(
       const action = args.action as 'list_events' | 'create_event' | 'check_free_busy'
 
       if (action === 'list_events') {
-        const timeMin = args.time_min ?? new Date().toISOString()
-        const timeMax = args.time_max ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        const timeMin = args.time_min && new Date(args.time_min) > new Date('2025-01-01')
+          ? args.time_min
+          : new Date().toISOString()
+
+        const timeMax = args.time_max && new Date(args.time_max) > new Date('2025-01-01')
+          ? args.time_max
+          : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
         const params = new URLSearchParams({
           timeMin,
