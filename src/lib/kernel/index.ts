@@ -55,8 +55,9 @@ Before every response, you receive a Living Context Block assembled from Redis c
 
 ## Your Limitations (be honest when asked)
 
-- No Google Calendar access yet — coming in Phase 8
-- No Gmail access yet — coming in Phase 8  
+- Google Calendar access — list, create, check schedule
+- Gmail access — search and read emails
+- Google Drive access — search and read files
 - No stock prices yet — Alpha Vantage key pending
 - Token limit: 100k tokens/day on Groq free tier. If hit, wait ~10 minutes.
 - Voice on web UI: built but needs debugging. Telegram voice notes: fully working.
@@ -254,6 +255,53 @@ export function getSolusTools(data?: any) {
             execute: async ({ message, duration }) => {
                 if (data) data.append({ type: 'thinking', step: `Setting reminder for ${duration}...` });
                 return executeTool('set-reminder', { message, duration });
+            }
+        }),
+
+        google_calendar: tool({
+            description: "Read, create, and check Tanmay's Google Calendar. Use for: checking schedule, creating events, finding free time, answering 'what do I have today/this week'. Actions: list_events, create_event, check_free_busy.",
+            parameters: z.object({
+                action: z.enum(['list_events', 'create_event', 'check_free_busy']),
+                time_min: z.string().optional().describe('ISO 8601 datetime — start of range'),
+                time_max: z.string().optional().describe('ISO 8601 datetime — end of range'),
+                max_results: z.number().optional(),
+                title: z.string().optional(),
+                start_time: z.string().optional().describe('ISO 8601 datetime in IST'),
+                end_time: z.string().optional().describe('ISO 8601 datetime in IST'),
+                description: z.string().optional(),
+                location: z.string().optional(),
+            }),
+            execute: async (args) => {
+                if (data) data.append({ type: 'thinking', step: 'Checking Google Calendar...' })
+                return executeTool('google-calendar', args)
+            }
+        }),
+
+        gmail_read: tool({
+            description: "Read Tanmay's Gmail inbox. Use for: checking unread emails, searching for specific emails, reading email threads. Actions: list_inbox, search_emails, read_thread.",
+            parameters: z.object({
+                action: z.enum(['list_inbox', 'search_emails', 'read_thread']),
+                query: z.string().optional().describe('Gmail search query e.g. "from:professor" or "subject:assignment"'),
+                max_results: z.number().optional(),
+                thread_id: z.string().optional(),
+            }),
+            execute: async (args) => {
+                if (data) data.append({ type: 'thinking', step: 'Checking Gmail...' })
+                return executeTool('gmail-read', args)
+            }
+        }),
+
+        google_drive: tool({
+            description: "Search and read files in Tanmay's Google Drive. Use for: finding documents, reading notes, accessing study materials. Actions: search_files, read_file.",
+            parameters: z.object({
+                action: z.enum(['search_files', 'read_file']),
+                query: z.string().optional().describe('Search term to find files'),
+                file_id: z.string().optional().describe('Drive file ID to read'),
+                max_results: z.number().optional(),
+            }),
+            execute: async (args) => {
+                if (data) data.append({ type: 'thinking', step: 'Searching Google Drive...' })
+                return executeTool('google-drive', args)
             }
         }),
     };

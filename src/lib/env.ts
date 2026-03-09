@@ -78,9 +78,11 @@ const envSchema = z.object({
     TELEGRAM_SECRET_TOKEN: z.string().optional(),
 
     // Google OAuth (Phase 8)
-    GOOGLE_CLIENT_ID: z.string().optional(),
-    GOOGLE_CLIENT_SECRET: z.string().optional(),
-    GOOGLE_REDIRECT_URI: z.string().optional(),
+    GOOGLE_CLIENT_ID: z.string().min(1),
+    GOOGLE_CLIENT_SECRET: z.string().min(1),
+    GOOGLE_REDIRECT_URI: z.string().url(),
+    GOOGLE_ACCESS_TOKEN: z.string().optional(),
+    GOOGLE_REFRESH_TOKEN: z.string().optional(),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
