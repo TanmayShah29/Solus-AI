@@ -162,6 +162,18 @@ export const POST = traceable(
                         return executeTool('telegram-send', { message })
                     }
                 }),
+
+                set_reminder: tool({
+                    description: 'Set a reminder that will be delivered to Tanmay on Telegram after a specified time. Use when he says "remind me in X to do Y", "set a reminder", or "message me in X about Y".',
+                    parameters: z.object({
+                        message: z.string().describe('The reminder message to send'),
+                        duration: z.string().describe('How long to wait e.g. "15 mins", "2 hours", "1 day"'),
+                    }),
+                    execute: async ({ message, duration }) => {
+                        data.append({ type: 'thinking', step: `Setting reminder for ${duration}...` });
+                        return executeTool('set-reminder', { message, duration })
+                    }
+                }),
             };
 
             // Get the latest user message to use as the memory query
