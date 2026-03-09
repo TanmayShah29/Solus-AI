@@ -127,6 +127,41 @@ export const POST = traceable(
                         return executeTool("news-headlines", { topic, max_results });
                     },
                 }),
+
+                youtube_summary: tool({
+                    description: 'Get a summary of any YouTube video. Use when the user shares a YouTube link or asks about video content.',
+                    parameters: z.object({
+                        url: z.string().describe('The YouTube URL'),
+                    }),
+                    execute: async ({ url }) => {
+                        data.append({ type: 'thinking', step: `Summarising YouTube video...` });
+                        return executeTool('youtube-summary', { url })
+                    }
+                }),
+
+                currency_convert: tool({
+                    description: 'Convert between currencies using live rates. Use when the user asks about currency conversion.',
+                    parameters: z.object({
+                        from: z.string().describe('Source currency code e.g. USD, INR, EUR'),
+                        to: z.string().describe('Target currency code e.g. USD, INR, EUR'),
+                        amount: z.number().describe('Amount to convert'),
+                    }),
+                    execute: async ({ from, to, amount }) => {
+                        data.append({ type: 'thinking', step: `Converting ${amount} ${from} to ${to}...` });
+                        return executeTool('currency-convert', { from, to, amount })
+                    }
+                }),
+
+                telegram_send: tool({
+                    description: 'Send a message to Tanmay on Telegram. Use when asked to send a reminder or notification.',
+                    parameters: z.object({
+                        message: z.string().describe('The message to send'),
+                    }),
+                    execute: async ({ message }) => {
+                        data.append({ type: 'thinking', step: `Sending Telegram message...` });
+                        return executeTool('telegram-send', { message })
+                    }
+                }),
             };
 
             // Get the latest user message to use as the memory query
