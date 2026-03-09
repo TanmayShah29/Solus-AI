@@ -3,17 +3,20 @@ import { storeMemory } from "@/lib/memory/retrieve";
 import { groq, FAST_MODEL } from "@/lib/groq/client";
 import { generateText } from "ai";
 
+interface ExtractionResult {
+    facts: string[];
+}
+
 export const extractMemory = inngest.createFunction(
     { id: "extract-memory" },
     { event: "solus/turn.completed" },
     async ({ event, step }) => {
         const { userMessage, assistantResponse } = event.data;
-        const userId = event.data.userId || "tanmay";
+        const userId = (event.data.userId as string) || "tanmay";
         console.log(`[Inngest] Starting extraction for user: ${userId}`);
 
         // Step 1: Extract facts using LLM
-        const extractionResult = await step.run("extract-facts", async () => {
-            // ... (keep prompt but add log)
+        const extractionResultText = await step.run("extract-facts", async () => {
             console.log("[Inngest] Extracting facts from LLM...");
             const prompt = `Extract 1-3 key facts worth remembering from this conversation turn.
 Only extract facts that would be useful context in future conversations.
@@ -33,13 +36,13 @@ Assistant: ${assistantResponse}`;
         });
 
         // Step 2: Parse and store facts
-        await step.run("store-facts", async () => {
-            if (!extractionResult || extractionResult.trim().toUpperCase() === "NONE") {
+        const extractedFacts = await step.run("store-facts", async () => {
+            if (!extractionResultText || extractionResultText.trim().toUpperCase() === "NONE") {
                 console.log("[Inngest] No facts to store.");
-                return;
+                return [];
             }
 
-            const lines = extractionResult.split("\n");
+            const lines = extractionResultText.split("\n");
             const facts = lines
                 .filter((line: string) => line.trim().startsWith("FACT:"))
                 .map((line: string) => line.replace("FACT:", "").trim())
@@ -53,21 +56,16 @@ Assistant: ${assistantResponse}`;
             return facts;
         });
 
-        const extractedMemories = extractionResult ? extractionResult.split("\n")
-            .filter((line: string) => line.trim().startsWith("FACT:"))
-            .map((line: string) => line.replace("FACT:", "").trim())
-            .filter(Boolean) : [];
-
         const conversationText = `User: ${userMessage}\nAssistant: ${assistantResponse}`;
 
         // Step 3: Judge each extracted fact
         await step.run("judge-facts", async () => {
-            console.log(`[Inngest] Judging ${extractedMemories.length} facts...`);
+            console.log(`[Inngest] Judging ${extractedFacts.length} facts...`);
             const { judgeFact } = await import("@/lib/reflection/judge");
             const { promoteToKnowledge } = await import("@/lib/reflection/promote-knowledge");
             const { supabaseAdmin: supabase } = await import("@/lib/supabase/admin");
 
-            for (const fact of extractedMemories) {
+            for (const fact of extractedFacts) {
                 const judgment = await judgeFact(fact, conversationText);
                 console.log(`[Inngest] Judgment for "${fact}": score=${judgment.score}, keep=${judgment.keep}`);
 

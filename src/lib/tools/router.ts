@@ -13,7 +13,7 @@ export type ToolResult = {
     result: unknown;
     summary: string;
     error?: string;
-    duration_ms: number;
+    executionMs: number;
 };
 
 const BASE_URL = process.env.VERCEL_URL
@@ -52,21 +52,21 @@ export async function executeTool(
             result: data.result ?? data,
             summary: data.summary ?? (response.ok ? "Tool executed successfully" : "Tool failed"),
             error: data.error,
-            duration_ms,
+            executionMs: duration_ms,
         };
 
         // Log to Supabase (Fire and forget, don't block response)
         logToolExecution(toolName, args, result).catch(console.error);
 
         return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
         const duration_ms = Date.now() - startTime;
         const result: ToolResult = {
             success: false,
             result: null,
             summary: "Tool failed",
-            error: error.message,
-            duration_ms,
+            error: error instanceof Error ? error.message : String(error),
+            executionMs: duration_ms,
         };
 
         logToolExecution(toolName, args, result).catch(console.error);
@@ -101,6 +101,6 @@ async function logToolExecution(
         args,
         result: result.result,
         success: result.success,
-        duration_ms: result.duration_ms,
+        duration_ms: result.executionMs,
     });
 }

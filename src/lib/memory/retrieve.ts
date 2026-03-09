@@ -28,7 +28,9 @@ export async function retrieveMemories(
             return [];
         }
 
-        const scoredMemories = (data as any[]).map(m => {
+        const rawData = data as { content: string; created_at: string; confidence: number }[];
+
+        const scoredMemories = rawData.map(m => {
             let score = m.confidence;
             const createdAt = new Date(m.created_at);
             const now = new Date();
