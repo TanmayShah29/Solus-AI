@@ -172,7 +172,21 @@ export async function POST(req: Request) {
         return Response.json({ ok: true })
     } catch (error: any) {
         console.error('Telegram webhook error:', error)
-        await sendTelegramMessage(chatId, `Something went wrong. Error: ` + (error.message || 'Unknown error'))
+        const message = error instanceof Error ? error.message : String(error)
+
+        let recoveryMessage = "Something went wrong, sir. I'm looking into it."
+
+        if (message.includes('rate_limit') || message.includes('429')) {
+            recoveryMessage = "Groq is rate-limiting us. Give me ten minutes."
+        } else if (message.includes('ECONNREFUSED') || message.includes('fetch')) {
+            recoveryMessage = "Can't reach the server right now. Try again in a moment."
+        } else if (message.includes('quota') || message.includes('100k')) {
+            recoveryMessage = "Daily token limit hit. Resets at midnight IST."
+        } else if (message.includes('whisper') || message.includes('transcri')) {
+            recoveryMessage = "Couldn't process the voice note. Send it as text and I'll handle it."
+        }
+
+        await sendTelegramMessage(chatId, recoveryMessage)
         return Response.json({ ok: true })
     }
 }
