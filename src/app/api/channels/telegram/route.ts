@@ -56,61 +56,64 @@ export async function POST(req: Request) {
         return Response.json({ ok: true })
     }
 
-    // Extract message content — handle both text and voice
-    let userMessage: string | null = null
+    try {
+        // Extract message content — handle both text and voice
+        let userMessage: string | null = null
 
-    if (message.text) {
-        userMessage = message.text
-    } else if (message.voice) {
-        await sendTypingIndicator(chatId)
+        if (message.text) {
+            userMessage = message.text
+        } else if (message.voice) {
+            await sendTypingIndicator(chatId)
 
-        // Get file path from Telegram
-        const fileRes = await fetch(
-            `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getFile?file_id=${message.voice.file_id}`
-        )
-        const fileData = await fileRes.json()
-        const filePath = fileData.result.file_path
+            // Get file path from Telegram
+            const fileRes = await fetch(
+                `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getFile?file_id=${message.voice.file_id}`
+            )
+            const fileData = await fileRes.json()
+            if (!fileData.ok) {
+                console.error('Telegram getFile failed:', fileData)
+                throw new Error(`Telegram getFile failed: ${fileData.description}`)
+            }
+            const filePath = fileData.result.file_path
 
-        console.log('Voice file path:', filePath)
+            console.log('Voice file path:', filePath)
 
-        // Download the audio file
-        const audioRes = await fetch(
-            `https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${filePath}`
-        )
-        const audioBuffer = await audioRes.arrayBuffer()
-        console.log('Audio buffer size:', audioBuffer.byteLength)
+            // Download the audio file
+            const audioRes = await fetch(
+                `https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${filePath}`
+            )
+            const audioBuffer = await audioRes.arrayBuffer()
+            console.log('Audio buffer size:', audioBuffer.byteLength)
 
-        const audioBlob = new Blob([audioBuffer], { type: 'audio/ogg; codecs=opus' })
+            const audioBlob = new Blob([audioBuffer], { type: 'audio/ogg; codecs=opus' })
 
-        // Transcribe with Groq Whisper
-        const formData = new FormData()
-        formData.append('file', audioBlob, 'voice.ogg')
-        formData.append('model', 'whisper-large-v3')
-        formData.append('language', 'en')
+            // Transcribe with Groq Whisper
+            const formData = new FormData()
+            formData.append('file', audioBlob, 'voice.ogg')
+            formData.append('model', 'whisper-large-v3')
+            formData.append('language', 'en')
 
-        const transcribeRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${env.GROQ_API_KEY}` },
-            body: formData,
-        })
+            const transcribeRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${env.GROQ_API_KEY}` },
+                body: formData,
+            })
 
-        if (!transcribeRes.ok) {
-            const errorBody = await transcribeRes.text()
-            console.error('Groq transcription failed:', transcribeRes.status, errorBody)
-            await sendTelegramMessage(chatId, "Couldn't transcribe your voice message. Try again.")
-            return Response.json({ ok: true })
+            if (!transcribeRes.ok) {
+                const errorBody = await transcribeRes.text()
+                console.error('Groq transcription failed:', transcribeRes.status, errorBody)
+                throw new Error(`Groq transcription failed: ${transcribeRes.status} ${errorBody}`)
+            }
+
+            const transcribeData = await transcribeRes.json()
+            userMessage = transcribeData.text
         }
 
-        const transcribeData = await transcribeRes.json()
-        userMessage = transcribeData.text
-    }
+        if (!userMessage) return Response.json({ ok: true })
 
-    if (!userMessage) return Response.json({ ok: true })
+        // Send typing indicator
+        await sendTypingIndicator(chatId)
 
-    // Send typing indicator
-    await sendTypingIndicator(chatId)
-
-    try {
         const userId = env.MY_USER_ID
 
         // Retrieve relevant memories
@@ -228,9 +231,9 @@ Current time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
         })
 
         return Response.json({ ok: true })
-    } catch (error) {
+    } catch (error: any) {
         console.error('Telegram webhook error:', error)
-        await sendTelegramMessage(chatId, "Something went wrong. Try again.")
+        await sendTelegramMessage(chatId, `Something went wrong. Error: ${error.message || 'Unknown error'}`)
         return Response.json({ ok: true })
     }
 }
