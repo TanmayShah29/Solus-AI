@@ -223,6 +223,7 @@ export const POST = traceable(
                         data: {
                             userMessage: messages[messages.length - 1].content,
                             assistantResponse: text,
+                            userId: env.MY_USER_ID,
                         },
                     });
 
