@@ -1,5 +1,20 @@
 import { retrieveMemories, type Memory } from "@/lib/memory/retrieve";
 import { redis, TTL } from '@/lib/redis/client'
+import { createClient } from "@/lib/supabase/server";
+import { env } from "@/lib/env";
+
+export type Task = {
+    title: string;
+    status: string;
+    priority?: number;
+    deadline?: string;
+};
+
+export type Person = {
+    name: string;
+    relationship?: string;
+    notes?: string;
+};
 
 export async function assembleContext(query: string): Promise<string> {
     const cacheKey = `solus:context:tanmay`
@@ -37,6 +52,42 @@ export async function assembleContext(query: string): Promise<string> {
     }
 
     return context
+}
+
+export async function getContextBlock(query: string): Promise<{
+    memories: Memory[],
+    activeTasks: Task[],
+    relevantPeople: Person[]
+}> {
+    const supabase = await createClient();
+
+    // 1. Fetch boosted memories
+    const memories = await retrieveMemories(query, 5);
+
+    // 2. Fetch active tasks
+    const { data: tasks } = await supabase
+        .from('tasks')
+        .select('title, status, priority, deadline')
+        .eq('user_id', env.MY_USER_ID)
+        .in('status', ['pending', 'in_progress'])
+        .order('priority', { ascending: false });
+
+    // 3. Scan for people
+    // Simple scan: fetch all people and check if name is in query (could be optimized)
+    const { data: allPeople } = await supabase
+        .from('people')
+        .select('name, relationship, notes')
+        .eq('user_id', env.MY_USER_ID);
+
+    const relevantPeople = (allPeople || []).filter(p =>
+        query.toLowerCase().includes(p.name.toLowerCase())
+    );
+
+    return {
+        memories,
+        activeTasks: (tasks || []) as Task[],
+        relevantPeople: relevantPeople as Person[]
+    };
 }
 
 export async function invalidateContextCache(): Promise<void> {

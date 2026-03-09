@@ -2,12 +2,13 @@ import { tool } from "ai";
 import { z } from "zod";
 import { executeTool } from "@/lib/tools/router";
 import { type Memory } from "@/lib/memory/retrieve";
+import { type Task, type Person } from "@/lib/memory/context-assembler";
 
 export type ContextBlock = {
     memories: Memory[];
     knowledgeFacts?: any[]; // To be refined in Section D
-    activeTasks?: any[];    // To be refined in Section D
-    relevantPeople?: any[];  // To be refined in Section D
+    activeTasks: Task[];
+    relevantPeople: Person[];
     currentTime: string;
 };
 

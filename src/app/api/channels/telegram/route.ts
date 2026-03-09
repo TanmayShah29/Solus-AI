@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { groq, REASONING_MODEL } from '@/lib/groq/client'
 import { generateText } from 'ai'
 import { retrieveMemories } from '@/lib/memory/retrieve'
-import { assembleContext } from '@/lib/memory/context-assembler'
+import { getContextBlock } from '@/lib/memory/context-assembler'
 import { inngest } from '@/inngest/client'
 import { getSolusTools, buildSystemPrompt, type ContextBlock } from '@/lib/kernel'
 
@@ -114,14 +114,14 @@ export async function POST(req: Request) {
 
         const userId = env.MY_USER_ID
 
-        // Retrieve relevant memories
-        const memoriesData = await retrieveMemories(userMessage, 5)
-        const contextData = await assembleContext(userMessage)
+        // Retrieve relevant context (memories, tasks, people)
+        const { memories, activeTasks, relevantPeople } = await getContextBlock(userMessage)
 
         const context: ContextBlock = {
-            memories: memoriesData,
+            memories,
+            activeTasks,
+            relevantPeople,
             currentTime: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-            // activeTasks and relevantPeople will be added in Section B
         };
 
         const systemPrompt = buildSystemPrompt(context);

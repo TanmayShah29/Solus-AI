@@ -4,7 +4,7 @@ import { traceable } from "langsmith/traceable";
 import { createClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
 
-import { assembleContext } from "@/lib/memory/context-assembler";
+import { getContextBlock } from "@/lib/memory/context-assembler";
 import { retrieveMemories } from "@/lib/memory/retrieve";
 import { inngest } from "@/inngest/client";
 import { getSolusTools, buildSystemPrompt, type ContextBlock } from "@/lib/kernel";
@@ -26,14 +26,14 @@ export const POST = traceable(
             // Append thinking indicator before memory retrieval
             data.append({ type: "thinking", step: "Searching memory..." });
 
-            // Fetch context and memories
-            const contextData = await assembleContext(latestMessage);
-            const memoriesData = await retrieveMemories(latestMessage, 5);
+            // Fetch context data (memories, tasks, people)
+            const { memories, activeTasks, relevantPeople } = await getContextBlock(latestMessage);
 
             const context: ContextBlock = {
-                memories: memoriesData,
+                memories,
+                activeTasks,
+                relevantPeople,
                 currentTime: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-                // activeTasks and relevantPeople will be added in Section B
             };
 
             const systemPrompt = buildSystemPrompt(context);

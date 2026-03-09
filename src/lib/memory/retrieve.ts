@@ -28,7 +28,27 @@ export async function retrieveMemories(
             return [];
         }
 
-        return data as Memory[];
+        const scoredMemories = (data as any[]).map(m => {
+            let score = m.confidence;
+            const createdAt = new Date(m.created_at);
+            const now = new Date();
+            const diffMs = now.getTime() - createdAt.getTime();
+            const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+            if (diffDays <= 1) {
+                score += 0.15; // 24h boost
+            } else if (diffDays > 30) {
+                score -= 0.05; // >30d penalty
+            }
+
+            return {
+                ...m,
+                confidence: Math.min(1, Math.max(0, score))
+            };
+        });
+
+        // Re-sort by boosted confidence
+        return scoredMemories.sort((a, b) => b.confidence - a.confidence) as Memory[];
     } catch (error) {
         console.error("Failed to retrieve memories:", error);
         return []; // Return empty array on failure instead of throwing
