@@ -3,6 +3,7 @@ import { groq, REASONING_MODEL } from "@/lib/groq/client";
 import { traceable } from "langsmith/traceable";
 import { createClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
+import { toolRatelimit } from "@/lib/redis/client";
 
 import { getContextBlock } from "@/lib/memory/context-assembler";
 import { retrieveMemories } from "@/lib/memory/retrieve";
@@ -15,6 +16,28 @@ export const maxDuration = 30;
 export const POST = traceable(
     async (req: Request) => {
         try {
+            // 1. Rate limiting check
+            const identifier = `chat:tanmay`;
+            const { success, limit, remaining, reset } = await toolRatelimit.limit(identifier);
+
+            if (!success) {
+                return new Response(
+                    JSON.stringify({
+                        error: "Rate limit exceeded. Give me a moment, sir.",
+                        reset: new Date(reset).toISOString(),
+                    }),
+                    {
+                        status: 429,
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-RateLimit-Limit": String(limit),
+                            "X-RateLimit-Remaining": String(remaining),
+                            "X-RateLimit-Reset": String(reset),
+                        },
+                    }
+                );
+            }
+
             const { messages } = await req.json();
             const data = new StreamData();
 
@@ -84,7 +107,17 @@ export const POST = traceable(
                 },
             });
 
-            return result.toDataStreamResponse({ data });
+            return new Response(result.toDataStream({ data }), {
+                headers: {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache, no-transform',
+                    'X-Accel-Buffering': 'no',
+                    'Connection': 'keep-alive',
+                    'X-RateLimit-Limit': String(limit),
+                    'X-RateLimit-Remaining': String(remaining),
+                    'X-RateLimit-Reset': String(reset),
+                },
+            });
         } catch (error) {
             return Response.json(
                 { error: error instanceof Error ? error.message : "Unknown error" },

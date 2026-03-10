@@ -28,9 +28,14 @@ const POST_HANDLER = async (req: Request) => {
             );
         }
 
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+
         const response = await fetch(url, {
+            signal: controller.signal,
             headers: { "User-Agent": "Mozilla/5.0 (compatible; Solus/1.0)" },
         });
+        clearTimeout(timeout);
 
         if (!response.ok) {
             return Response.json({
@@ -62,11 +67,12 @@ const POST_HANDLER = async (req: Request) => {
             duration_ms: Date.now() - start,
         });
     } catch (error: any) {
+        console.error("read_url error:", error);
         return Response.json({
             success: false,
             result: null,
             summary: `Tool failed: ${error.message}`,
-            error: error.message,
+            error: error instanceof Error ? `${error.message} — ${error.cause}` : String(error),
             duration_ms: Date.now() - start,
         });
     }
