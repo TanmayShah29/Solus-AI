@@ -1,124 +1,93 @@
-/**
- * src/lib/speech/tts.ts
- *
- * Text-to-speech using browser speechSynthesis.
- * Configured for a British male "Jarvis-like" voice.
- * Handles the Chrome 15-second cutoff by chunking sentences.
- */
+'use client'
 
-'use client';
-
-let selectedVoice: SpeechSynthesisVoice | null = null;
-let isSpeakingGlobal = false;
+let selectedVoice: SpeechSynthesisVoice | null = null
+let isSpeaking = false
+let onEndCallback: (() => void) | null = null
 
 function getBritishVoice(): SpeechSynthesisVoice | null {
-    if (typeof window === "undefined") return null;
-
-    const voices = window.speechSynthesis.getVoices();
-
-    // Priority order for Jarvis vibes
-    const preferredNames = [
-        "Google UK English Male",
-        "Daniel",    // Classic macOS British Male
-        "Arthur",    // Newer macOS British Male
-        "Oliver",
-        "Google UK English Female", // fallback
-    ];
-
-    for (const name of preferredNames) {
-        const voice = voices.find(v => v.name === name);
-        if (voice) return voice;
+    if (typeof window === 'undefined') return null
+    const voices = window.speechSynthesis.getVoices()
+    const preferred = [
+        'Google UK English Male',
+        'Daniel',
+        'Arthur',
+        'Google UK English Female',
+    ]
+    for (const name of preferred) {
+        const voice = voices.find(v => v.name === name)
+        if (voice) return voice
     }
-
-    // Last resort: any GB voice
-    return voices.find(v => v.lang === "en-GB") ?? null;
+    return voices.find(v => v.lang === 'en-GB') ?? null
 }
 
-/**
- * Strips markdown and splits into sentences for chunked playback
- */
-function splitIntoChunks(text: string): string[] {
+function cleanText(text: string): string {
     return text
-        .replace(/#{1,6}\s/g, "")                    // Header markdown
-        .replace(/\*\*(.*?)\*\*/g, "$1")            // Bold
-        .replace(/\*(.*?)\*/g, "$1")                // Italic
-        .replace(/`(.*?)`/g, "$1")                  // Inline code
-        .replace(/```[\s\S]*?```/g, "Code omitted") // Code blocks
-        .replace(/\[(.*?)\]\(.*?\)/g, "$1")         // Links
-        .split(/(?<=[.!?])\s+/)                     // Split by punctuation
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
+        .replace(/#{1,6}\s/g, '')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/`(.*?)`/g, '$1')
+        .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+        .replace(/\n+/g, ' ')
+        .trim()
+}
+
+function splitIntoChunks(text: string): string[] {
+    return cleanText(text)
+        .split(/(?<=[.!?])\s+/)
+        .filter(s => s.trim().length > 0)
 }
 
 export function speak(text: string, onEnd?: () => void): void {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    if (typeof window === 'undefined' || !window.speechSynthesis) return
 
-    // Stop anything currently speaking
-    window.speechSynthesis.cancel();
-    isSpeakingGlobal = true;
+    window.speechSynthesis.cancel()
+    isSpeaking = true
+    onEndCallback = onEnd ?? null
 
-    const chunks = splitIntoChunks(text);
-    if (chunks.length === 0) {
-        isSpeakingGlobal = false;
-        onEnd?.();
-        return;
-    }
+    const chunks = splitIntoChunks(text)
+    if (!selectedVoice) selectedVoice = getBritishVoice()
 
-    if (!selectedVoice) selectedVoice = getBritishVoice();
-
-    let index = 0;
+    let index = 0
 
     function speakNext() {
-        if (index >= chunks.length || !isSpeakingGlobal) {
-            isSpeakingGlobal = false;
-            onEnd?.();
-            return;
+        if (index >= chunks.length || !isSpeaking) {
+            isSpeaking = false
+            onEndCallback?.()
+            onEndCallback = null
+            return
         }
-
-        const utterance = new SpeechSynthesisUtterance(chunks[index++]);
-        if (selectedVoice) {
-            utterance.voice = selectedVoice;
+        const utterance = new SpeechSynthesisUtterance(chunks[index++])
+        if (selectedVoice) utterance.voice = selectedVoice
+        utterance.rate = 0.92
+        utterance.pitch = 0.85
+        utterance.volume = 1.0
+        utterance.onend = speakNext
+        utterance.onerror = () => {
+            isSpeaking = false
+            onEndCallback?.()
         }
-
-        // JARVIS calibration
-        utterance.rate = 0.95;
-        utterance.pitch = 0.9;
-        utterance.volume = 1.0;
-
-        utterance.onend = speakNext;
-        utterance.onerror = (e) => {
-            console.error("SpeechSynthesis error:", e);
-            speakNext();
-        };
-
-        window.speechSynthesis.speak(utterance);
+        window.speechSynthesis.speak(utterance)
     }
 
-    speakNext();
+    speakNext()
 }
 
 export function stopSpeaking(): void {
-    isSpeakingGlobal = false;
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
+    isSpeaking = false
+    onEndCallback = null
+    if (typeof window !== 'undefined') {
+        window.speechSynthesis?.cancel()
     }
 }
 
 export function getIsSpeaking(): boolean {
-    return isSpeakingGlobal;
+    return isSpeaking
 }
 
-/**
- * Call this on app mount to pre-fill voices
- */
 export function loadVoices(): void {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-
-    // Fetch initial list
-    window.speechSynthesis.getVoices();
-
-    // Voices load async on some browsers
+    if (typeof window === 'undefined') return
+    window.speechSynthesis.getVoices()
     window.speechSynthesis.onvoiceschanged = () => {
-        selectedVoice = getBritishVoice();
-    };
+        selectedVoice = getBritishVoice()
+    }
 }
