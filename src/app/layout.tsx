@@ -1,6 +1,7 @@
 import "./globals.css";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { Nav } from '@/components/layout/Nav'
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -16,8 +17,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={cn("dark", "font-sans", geist.variable)}>
-      <body className="font-mono antialiased bg-slate-950 text-slate-100">
-        {children}
+      <body className="font-mono antialiased bg-slate-950 text-slate-100 min-h-screen">
+        <Nav />
+        <main className="ml-14 min-h-screen">
+          {children}
+        </main>
       </body>
     </html>
   );
