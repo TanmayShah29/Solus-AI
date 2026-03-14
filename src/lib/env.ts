@@ -85,8 +85,8 @@ const envSchema = z.object({
     GOOGLE_REFRESH_TOKEN: z.string().optional(),
 
     // GitHub (Long Term Memory)
-    GITHUB_TOKEN: z.string().optional(),
-    GITHUB_REPO: z.string().optional(),
+    GITHUB_TOKEN: z.string().min(1, "GITHUB_TOKEN is required"),
+    GITHUB_REPO: z.string().min(1, "GITHUB_REPO is required"), // format: "TanmayShah29/Solus-AI"
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -304,5 +304,17 @@ export function getSolusTools(data?: any) {
                 return executeTool('google-drive', args)
             }
         }),
+
+        update_memory: tool({
+            description: "Permanently save important facts about Tanmay to long-term memory. Use this proactively when Tanmay shares something worth remembering — a preference, a decision, a goal, a fact about his life, a project update. Do not use for trivial or temporary things. Examples of when to use: he mentions his favourite food, he tells you about a new project, he shares a deadline, he corrects something you knew wrongly.",
+            parameters: z.object({
+                facts: z.array(z.string()).describe('Array of facts to remember. Each fact should be a single clear sentence.'),
+                section: z.string().describe('Section in memory.md to add facts under. Use existing sections: "About Tanmay", "Projects", "Preferences & Patterns", "Technical Decisions Made", "Conversation History Notes". Create a new section name if none fit.'),
+            }),
+            execute: async (args) => {
+                if (data) data.append({ type: 'thinking', step: 'Saving to long-term memory...' })
+                return executeTool('update-memory', args)
+            }
+        }),
     };
 }
