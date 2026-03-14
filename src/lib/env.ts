@@ -76,6 +76,7 @@ const envSchema = z.object({
     // Telegram (Phase 5)
     TELEGRAM_BOT_TOKEN: z.string().optional(),
     TELEGRAM_SECRET_TOKEN: z.string().optional(),
+    TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
 
     // Google OAuth (Phase 8)
     GOOGLE_CLIENT_ID: z.string().min(1),

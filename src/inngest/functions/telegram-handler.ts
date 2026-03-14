@@ -2,207 +2,253 @@ import { inngest } from '@/inngest/client'
 import { env } from '@/lib/env'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { groq, REASONING_MODEL } from '@/lib/groq/client'
-import { streamText, type CoreMessage } from 'ai'
+import { generateText, type CoreMessage } from 'ai'
+import { getErrorMessage } from '@/lib/errors/messages'
 import { assembleContext } from '@/lib/memory/context-assembler'
-import { buildSystemPrompt } from '@/lib/kernel'
+import { buildSystemPrompt } from '@/lib/kernel/index'
 import { loadSkills } from '@/lib/skills/loader'
 
-async function sendTelegramMessage(chatId: number, text: string): Promise<void> {
-    await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            chat_id: chatId,
-            text,
-            parse_mode: 'Markdown',
-        }),
-    })
+const VISION_MODEL = 'llama-3.2-90b-vision-preview'
+
+async function sendTyping(chatId: number) {
+  await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendChatAction`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, action: 'typing' }),
+  }).catch(() => {})
 }
 
-async function sendTypingIndicator(chatId: number): Promise<void> {
-    await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendChatAction`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            chat_id: chatId,
-            action: 'typing',
-        }),
-    }).catch(() => { })
+async function sendMessage(chatId: number, text: string): Promise<number | null> {
+  const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: text || '...',
+      parse_mode: 'Markdown',
+    }),
+  })
+  const data = await res.json()
+  return data.result?.message_id ?? null
 }
 
-async function sendReaction(chatId: number, messageId: number, emoji: string): Promise<void> {
-    await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/setMessageReaction`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            chat_id: chatId,
-            message_id: messageId,
-            reaction: [{ type: 'emoji', emoji }],
-        }),
-    }).catch(() => { })
+async function editMessage(chatId: number, messageId: number, text: string) {
+  await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+      text: text || '...',
+      parse_mode: 'Markdown',
+    }),
+  }).catch(() => {})
+}
+
+async function sendReaction(chatId: number, messageId: number, emoji: string) {
+  await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/setMessageReaction`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+      reaction: [{ type: 'emoji', emoji }],
+    }),
+  }).catch(() => {})
 }
 
 async function getTelegramHistory(chatId: number, limit = 10): Promise<CoreMessage[]> {
-    const sessionId = `telegram_${chatId}`
-    const { data, error } = await supabaseAdmin
-        .from('conversations')
-        .select('role, content')
-        .eq('user_id', 'tanmay')
-        .eq('session_id', sessionId)
-        .order('created_at', { ascending: false })
-        .limit(limit)
-
-    if (error || !data) return []
-
-    return data.reverse().map(row => ({
-        role: row.role as 'user' | 'assistant',
-        content: row.content,
-    })) as CoreMessage[]
+  const sessionId = `telegram_${chatId}`
+  const { data } = await supabaseAdmin
+    .from('conversations')
+    .select('role, content')
+    .eq('user_id', 'tanmay')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  
+  if (!data) return []
+  
+  return data.reverse().map(row => ({
+    role: row.role as 'user' | 'assistant',
+    content: row.content,
+  })) as CoreMessage[]
 }
 
 export const telegramHandler = inngest.createFunction(
-    { id: "telegram-handler", concurrency: 1 },
-    { event: "telegram/message.received" },
-    async ({ event, step }: { event: any, step: any }) => {
-        const { message, chatId, messageId, telegramUserId } = event.data
+  { 
+    id: 'telegram-handler',
+    name: 'Telegram Message Handler',
+    retries: 1,
+    concurrency: 1, // Sequential processing per bot
+  },
+  { event: 'solus/telegram.message' },
+  async ({ event, step }: { event: any, step: any }) => {
+    const { message } = event.data
+    const chatId = message.chat.id
+    const messageId = message.message_id
+    const sessionId = `telegram_${chatId}`
 
-        const typingInterval = setInterval(() => sendTypingIndicator(chatId), 4000)
+    // Start typing indicator
+    await sendTyping(chatId)
 
-        try {
-            let userMessage = message.text || message.caption || ''
-            let imageBase64 = null
-            const imageMimeType = 'image/jpeg'
+    // Keep typing alive during processing
+    const typingInterval = setInterval(() => sendTyping(chatId), 4000)
 
-            if (message.photo) {
-                imageBase64 = await step.run("download-photo", async () => {
-                    const photo = message.photo[message.photo.length - 1]
-                    const fileRes = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getFile?file_id=${photo.file_id}`)
-                    const fileData = await fileRes.json()
-                    const filePath = fileData.result?.file_path
-                    if (!filePath) return null
-                    
-                    const imageRes = await fetch(`https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${filePath}`)
-                    const imageBuffer = await imageRes.arrayBuffer()
-                    return Buffer.from(imageBuffer).toString('base64')
-                })
-                userMessage = userMessage || 'Explain this image.'
-            }
+    try {
+      // Handle content extraction
+      let messageText = message.text ?? message.caption ?? ''
+      let imageBase64: string | null = null
 
-            if (message.voice) {
-                userMessage = await step.run("transcribe-voice", async () => {
-                    const fileRes = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getFile?file_id=${message.voice.file_id}`)
-                    const fileData = await fileRes.json()
-                    const filePath = fileData.result?.file_path
-                    if (!filePath) return null
+      // Handle photos
+      if (message.photo) {
+        imageBase64 = await step.run("download-photo", async () => {
+          const photo = message.photo[message.photo.length - 1]
+          const fileRes = await fetch(
+            `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getFile?file_id=${photo.file_id}`
+          )
+          const fileData = await fileRes.json()
+          const filePath = fileData.result?.file_path
+          if (!filePath) return null
+          
+          const imageRes = await fetch(
+            `https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${filePath}`
+          )
+          const imageBuffer = await imageRes.arrayBuffer()
+          return Buffer.from(imageBuffer).toString('base64')
+        })
+        if (!messageText) messageText = 'Explain this image.'
+      }
 
-                    const audioRes = await fetch(`https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${filePath}`)
-                    const audioBuffer = await audioRes.arrayBuffer()
-                    
-                    const formData = new FormData()
-                    formData.append('file', new Blob([audioBuffer], { type: 'audio/ogg; codecs=opus' }), 'voice.ogg')
-                    formData.append('model', 'whisper-large-v3')
-                    formData.append('language', 'en')
-                    
-                    const transcribeRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${env.GROQ_API_KEY}` },
-                        body: formData,
-                    })
-                    
-                    if (transcribeRes.ok) {
-                        const transcribeData = await transcribeRes.json()
-                        return transcribeData.text
-                    }
-                    return null
-                })
-            }
+      // Handle voice notes
+      if (message.voice) {
+        messageText = await step.run("transcribe-voice", async () => {
+          const fileRes = await fetch(
+            `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getFile?file_id=${message.voice.file_id}`
+          )
+          const fileData = await fileRes.json()
+          const filePath = fileData.result?.file_path
+          if (!filePath) return null
 
-            if (!userMessage && !imageBase64) {
-                clearInterval(typingInterval)
-                return { ok: true }
-            }
+          const voiceRes = await fetch(
+            `https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${filePath}`
+          )
+          const voiceBuffer = await voiceRes.arrayBuffer()
+          const formData = new FormData()
+          formData.append('file', new Blob([voiceBuffer], { type: 'audio/ogg' }), 'voice.oga')
+          formData.append('model', 'whisper-large-v3')
 
-            const context = await step.run("assemble-context", async () => {
-                return assembleContext(env.MY_USER_ID, userMessage || "Explain this image.")
-            })
+          const transcribeRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${env.GROQ_API_KEY}` },
+            body: formData,
+          })
+          const transcribeData = await transcribeRes.json()
+          return transcribeData.text ?? ''
+        })
+      }
 
-            const history = await step.run("get-history", async () => {
-                return getTelegramHistory(chatId)
-            })
+      if (!messageText && !imageBase64) {
+        clearInterval(typingInterval)
+        return { skipped: 'no content' }
+      }
 
-            const systemPrompt = buildSystemPrompt(context) + `
+      // Assemble context
+      const context = await step.run("assemble-context", async () => {
+        return assembleContext('tanmay', messageText)
+      })
 
-## Vision
-When Tanmay shares an image:
-- Describe what you see concisely and relevantly
-- Never say "I can see an image" — just respond to what's in it`;
+      // Load conversation history
+      const history = await step.run("get-history", async () => {
+        return getTelegramHistory(chatId, 10)
+      })
 
-            const tools = loadSkills(null)
-            const VISION_MODEL = 'llama-3.2-90b-vision-preview'
-            
-            const historyMessages = (history as any[]).map(m => ({
-                role: m.role,
-                content: m.content
-            }))
+      // Build system prompt and tools
+      const systemPrompt = buildSystemPrompt(context)
+      const tools = loadSkills(null)
 
-            const userContentPart: any = imageBase64
-                ? [
-                    { type: 'image' as const, image: imageBase64, mimeType: imageMimeType },
-                    { type: 'text' as const, text: userMessage },
-                ]
-                : userMessage;
+      // Build messages
+      const userContentPart: any = imageBase64
+        ? [
+            { type: 'image' as const, image: imageBase64, mimeType: 'image/jpeg' },
+            { type: 'text' as const, text: messageText },
+          ]
+        : messageText
 
-            const messages: CoreMessage[] = [
-                ...historyMessages,
-                { role: 'user', content: userContentPart }
-            ] as any[];
+      const messages: any[] = [
+        ...(history as any[]).map(m => ({ role: m.role, content: m.content })),
+        { role: 'user', content: userContentPart },
+      ]
 
-            let toolUsed = false
-            const result = streamText({
-                model: groq(imageBase64 ? VISION_MODEL : REASONING_MODEL),
-                system: systemPrompt,
-                messages: messages as any,
-                tools,
-                maxSteps: 8,
-                onChunk: async ({ chunk }) => {
-                    if (chunk.type === 'tool-call' && !toolUsed) {
-                        toolUsed = true
-                        await sendReaction(chatId, messageId, '🔍')
-                    }
-                },
-            })
+      // Initial visual feedback
+      await sendReaction(chatId, messageId, '🔍')
+      const placeholderMessageId = await step.run("send-placeholder", async () => {
+        return sendMessage(chatId, '...')
+      })
 
-            const text = await result.text;
-            clearInterval(typingInterval)
+      // Generate response
+      const result = await step.run("generate-response", async () => {
+        const { text } = await generateText({
+          model: groq(imageBase64 ? VISION_MODEL : REASONING_MODEL),
+          system: systemPrompt,
+          messages,
+          tools,
+          maxSteps: 8,
+        })
+        return text
+      })
 
-            // Send response
-            await step.run("send-response", async () => {
-                if (text.trim()) {
-                    await sendTelegramMessage(chatId, text)
-                    await sendReaction(chatId, messageId, '✅')
-                }
-            })
+      const fullText = result
 
-            // Save history & trigger memory extraction
-            await step.run("save-and-extract", async () => {
-                const sessionId = `telegram_${chatId}`
-                await Promise.all([
-                    supabaseAdmin.from('conversations').insert([
-                        { user_id: env.MY_USER_ID, session_id: sessionId, channel: 'telegram', role: 'user', content: userMessage || "[Image]" },
-                        { user_id: env.MY_USER_ID, session_id: sessionId, channel: 'telegram', role: 'assistant', content: text }
-                    ]),
-                    inngest.send({
-                        name: 'solus/turn.completed',
-                        data: { userId: env.MY_USER_ID, userMessage: userMessage || "[Image]", assistantResponse: text },
-                    })
-                ])
-            })
-
-            return { ok: true }
-        } catch (error) {
-            clearInterval(typingInterval)
-            await sendReaction(chatId, messageId, '⚡')
-            throw error
+      // Edit placeholder with final response
+      await step.run("deliver-response", async () => {
+        if (placeholderMessageId && fullText.trim()) {
+          await editMessage(chatId, placeholderMessageId, fullText)
+        } else if (fullText.trim()) {
+          await sendMessage(chatId, fullText)
         }
+        await sendReaction(chatId, messageId, '✅')
+      })
+
+      // Save to conversation history
+      await step.run("persist-history", async () => {
+        await Promise.all([
+          supabaseAdmin.from('conversations').insert({
+            user_id: 'tanmay',
+            session_id: sessionId,
+            channel: 'telegram',
+            role: 'user',
+            content: messageText || "[Image]",
+          }),
+          supabaseAdmin.from('conversations').insert({
+            user_id: 'tanmay',
+            session_id: sessionId,
+            channel: 'telegram',
+            role: 'assistant',
+            content: fullText,
+          }),
+        ])
+      })
+
+      // Fire memory extraction
+      await inngest.send({
+        name: 'solus/turn.completed',
+        data: {
+          userId: 'tanmay',
+          userMessage: messageText || "[Image]",
+          assistantResponse: fullText,
+        },
+      })
+
+      clearInterval(typingInterval)
+      return { success: true, messageLength: fullText.length }
+
+    } catch (error) {
+      clearInterval(typingInterval)
+      console.error('Telegram handler error:', error)
+      await sendReaction(chatId, messageId, '⚡')
+      await sendMessage(chatId, getErrorMessage(error))
+      throw error // Let Inngest handle the retry
     }
+  }
 )
