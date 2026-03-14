@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic'
 import { ChatInterface } from '@/components/chat/ChatInterface'
 
 const SplineScene = dynamic(
-  () => import('@/components/ui/splite').then(m => ({ default: m.SplineScene })),
+  () => import('@/components/ui/splite'),
   { ssr: false }
 )
 

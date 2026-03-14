@@ -660,10 +660,15 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                                                     : "bg-transparent hover:bg-gray-600/30 text-[#9CA3AF] hover:text-[#D1D5DB]"
                             )}
                             onClick={() => {
-                                if (onMicClick) onMicClick();
-                                else if (isRecording) setIsRecording(false);
-                                else if (hasContent) handleSubmit();
-                                else setIsRecording(true);
+                                if (hasContent) {
+                                    handleSubmit();
+                                } else if (onMicClick) {
+                                    onMicClick();
+                                } else if (isRecording) {
+                                    setIsRecording(false);
+                                } else {
+                                    setIsRecording(true);
+                                }
                             }}
                             disabled={isLoading && !hasContent}
                             type="button"

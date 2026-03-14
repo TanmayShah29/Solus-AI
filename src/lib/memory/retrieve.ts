@@ -1,5 +1,5 @@
 import { embedText } from "@/lib/memory/embed";
-import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { env } from "@/lib/env";
 import { invalidateContextCache } from "@/lib/memory/context-assembler";
 
@@ -15,9 +15,8 @@ export async function retrieveMemories(
 ): Promise<Memory[]> {
     try {
         const embedding = await embedText(query);
-        const supabase = await createClient();
 
-        const { data, error } = await supabase.rpc("match_memories", {
+        const { data, error } = await supabaseAdmin.rpc("match_memories", {
             query_embedding: embedding,
             match_user_id: env.MY_USER_ID,
             match_limit: limit,

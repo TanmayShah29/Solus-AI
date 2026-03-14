@@ -1,6 +1,6 @@
 import { retrieveMemories, type Memory } from "@/lib/memory/retrieve";
 import { redis, TTL } from '@/lib/redis/client'
-import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { env } from "@/lib/env";
 
 export type Task = {
@@ -59,13 +59,11 @@ export async function getContextBlock(query: string): Promise<{
     activeTasks: Task[],
     relevantPeople: Person[]
 }> {
-    const supabase = await createClient();
-
     // 1. Fetch boosted memories
     const memories = await retrieveMemories(query, 5);
 
     // 2. Fetch active tasks
-    const { data: tasks } = await supabase
+    const { data: tasks } = await supabaseAdmin
         .from('tasks')
         .select('title, status, priority, deadline')
         .eq('user_id', env.MY_USER_ID)
@@ -73,8 +71,7 @@ export async function getContextBlock(query: string): Promise<{
         .order('priority', { ascending: false });
 
     // 3. Scan for people
-    // Simple scan: fetch all people and check if name is in query (could be optimized)
-    const { data: allPeople } = await supabase
+    const { data: allPeople } = await supabaseAdmin
         .from('people')
         .select('name, relationship, notes')
         .eq('user_id', env.MY_USER_ID);
@@ -89,6 +86,7 @@ export async function getContextBlock(query: string): Promise<{
         relevantPeople: relevantPeople as Person[]
     };
 }
+
 
 export async function invalidateContextCache(): Promise<void> {
     try {

@@ -1,5 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
-import { env } from "@/lib/env";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 /**
  * Generates an embedding for a piece of text by calling the Supabase `embed` Edge Function.
@@ -9,9 +8,7 @@ import { env } from "@/lib/env";
  * Subsequent warm invocations take ~100ms.
  */
 export async function embedText(text: string): Promise<number[]> {
-    const supabase = await createClient();
-
-    const { data, error } = await supabase.functions.invoke("embed", {
+    const { data, error } = await supabaseAdmin.functions.invoke("embed", {
         body: { text },
     });
 

@@ -259,11 +259,11 @@ export function getSolusTools(data?: any) {
         }),
 
         google_calendar: tool({
-            description: "Read, create, and check Tanmay's Google Calendar. Use for: checking schedule, creating events, finding free time, answering 'what do I have today/this week'. Always use current real-world dates. Today is " + new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) + ". Never guess or hallucinate dates. Actions: list_events, create_event, check_free_busy.",
+            description: "Read, create, and check Tanmay's Google Calendar. Actions: list_events, create_event, check_free_busy.",
             parameters: z.object({
                 action: z.enum(['list_events', 'create_event', 'check_free_busy']),
-                time_min: z.string().optional().describe('ISO 8601 datetime — start of range'),
-                time_max: z.string().optional().describe('ISO 8601 datetime — end of range'),
+                time_min: z.string().optional().describe('ISO 8601 datetime'),
+                time_max: z.string().optional().describe('ISO 8601 datetime'),
                 max_results: z.number().optional(),
                 title: z.string().optional(),
                 start_time: z.string().optional().describe('ISO 8601 datetime in IST'),
@@ -278,10 +278,10 @@ export function getSolusTools(data?: any) {
         }),
 
         gmail_read: tool({
-            description: "Read Tanmay's Gmail inbox. Use for: checking unread emails, searching for specific emails, reading email threads. Actions: list_inbox, search_emails, read_thread.",
+            description: "Read Tanmay's Gmail inbox. Actions: list_inbox, search_emails, read_thread.",
             parameters: z.object({
                 action: z.enum(['list_inbox', 'search_emails', 'read_thread']),
-                query: z.string().optional().describe('Gmail search query e.g. "from:professor" or "subject:assignment"'),
+                query: z.string().optional().describe('Gmail search query'),
                 max_results: z.number().optional(),
                 thread_id: z.string().optional(),
             }),
@@ -292,11 +292,11 @@ export function getSolusTools(data?: any) {
         }),
 
         google_drive: tool({
-            description: "Search and read files in Tanmay's Google Drive. Use for: finding documents, reading notes, accessing study materials. Actions: search_files, read_file.",
+            description: "Search and read files in Tanmay's Google Drive. Actions: search_files, read_file.",
             parameters: z.object({
                 action: z.enum(['search_files', 'read_file']),
-                query: z.string().optional().describe('Search term to find files'),
-                file_id: z.string().optional().describe('Drive file ID to read'),
+                query: z.string().optional().describe('Search term'),
+                file_id: z.string().optional().describe('Drive file ID'),
                 max_results: z.number().optional(),
             }),
             execute: async (args) => {

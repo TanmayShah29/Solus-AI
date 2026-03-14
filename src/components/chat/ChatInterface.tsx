@@ -11,7 +11,7 @@ export function ChatInterface() {
     const [voiceEnabled, setVoiceEnabled] = useState(false);
     const lastAssistantMessageRef = useRef<string>("");
 
-    const { messages, append, isLoading, data } = useChat({
+    const { messages, input, setInput, append, isLoading, data } = useChat({
         api: "/api/chat",
     });
 
@@ -21,10 +21,23 @@ export function ChatInterface() {
         }
     }, [append]);
 
+    const handleToggleVoice = useCallback(() => {
+        setVoiceEnabled(prev => !prev);
+    }, []);
+
     const { voiceState, activate, deactivate, speakResponse } = useVoiceConversation({
         enabled: voiceEnabled,
         onTranscription: handleTranscription,
     });
+
+    // Sync VAD with voiceEnabled state
+    useEffect(() => {
+        if (voiceEnabled) {
+            activate();
+        } else {
+            deactivate();
+        }
+    }, [voiceEnabled, activate, deactivate]);
 
     // Watch for new assistant messages and speak them
     useEffect(() => {
@@ -45,7 +58,7 @@ export function ChatInterface() {
         return data
             .filter((d: any) => d && d.type === "thinking" && d.step)
             .map((d: any) => d.step as string);
-    }, [data, isLoading]);
+    }, [data, isLoading, messages]); // messages added as suggested to ensure re-renders during turns
 
     return (
         <div className="flex flex-col w-full bg-transparent">
@@ -66,7 +79,7 @@ export function ChatInterface() {
                     }}
                     isLoading={isLoading}
                     placeholder="Ask Solus anything..."
-                    onMicClick={voiceEnabled ? deactivate : activate}
+                    onMicClick={handleToggleVoice}
                     voiceState={voiceState}
                 />
             </div>
