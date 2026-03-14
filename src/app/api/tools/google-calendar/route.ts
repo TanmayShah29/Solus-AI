@@ -36,6 +36,10 @@ export const POST = traceable(
         )
         const data = await res.json()
 
+        if (!res.ok) {
+          throw new Error(`Google Calendar API error: ${data.error?.message || res.statusText}`);
+        }
+
         const events = (data.items ?? []).map((e: any) => ({
           id: e.id,
           title: e.summary,
@@ -69,6 +73,10 @@ export const POST = traceable(
         )
         const event = await res.json()
 
+        if (!res.ok) {
+          throw new Error(`Google Calendar API error: ${event.error?.message || res.statusText}`);
+        }
+
         return Response.json({
           success: true,
           result: { id: event.id, title: event.summary, start: event.start?.dateTime },
@@ -89,6 +97,11 @@ export const POST = traceable(
           { method: 'POST', body: JSON.stringify(body) }
         )
         const data = await res.json()
+
+        if (!res.ok) {
+          throw new Error(`Google Calendar API error: ${data.error?.message || res.statusText}`);
+        }
+
         const busy = data.calendars?.primary?.busy ?? []
 
         return Response.json({

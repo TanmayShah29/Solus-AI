@@ -7,6 +7,7 @@
 import { env } from "@/lib/env";
 import { tavily } from "@tavily/core";
 import { traceable } from "langsmith/traceable";
+import { getCached, setCached } from '@/lib/redis/client';
 
 // Standard tool results formatting
 const POST_HANDLER = async (req: Request) => {
@@ -29,13 +30,19 @@ const POST_HANDLER = async (req: Request) => {
             );
         }
 
+        const cacheKey = `search:${query.toLowerCase()}:${max_results ?? 5}`;
+        const cached = await getCached<any>(cacheKey);
+        if (cached) {
+            return Response.json({ ...cached, cached: true, duration_ms: Date.now() - start });
+        }
+
         const client = tavily({ apiKey: process.env.TAVILY_API_KEY! });
         const response = await client.search(query, {
             maxResults: max_results ?? 5,
             searchDepth: "basic",
         });
 
-        return Response.json({
+        const result = {
             success: true,
             result: response.results.map((r) => ({
                 title: r.title,
@@ -44,6 +51,12 @@ const POST_HANDLER = async (req: Request) => {
                 score: r.score,
             })),
             summary: `Found ${response.results.length} results for "${query}". Top result: ${response.results[0]?.title ?? "none"}`,
+        };
+
+        await setCached(cacheKey, result, 60 * 60); // 1 hour TTL
+
+        return Response.json({
+            ...result,
             duration_ms: Date.now() - start,
         });
     } catch (error: any) {
