@@ -1,5 +1,5 @@
 import { streamText, StreamData } from "ai";
-import { groq, REASONING_MODEL, FAST_MODEL } from "@/lib/groq/client";
+import { groq, google, REASONING_MODEL, FAST_MODEL, GEMINI_MODEL, isGroqLimited, markGroqLimited } from "@/lib/groq/client";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { env } from "@/lib/env";
 import { toolRatelimit, dailyBudget } from "@/lib/redis/client";
@@ -31,10 +31,26 @@ const isSimpleMessage = (text: string) => {
 export async function POST(req: Request) {
     const data = new StreamData();
     try {
-        // 0. Token budget check
+        // 0. Check if Groq is already known to be limited
+        const groqLimited = await isGroqLimited();
+
+        if (groqLimited && !google) {
+            return new Response(
+                JSON.stringify({
+                    error: "Daily token limit hit. Resets at midnight IST.",
+                }),
+                { status: 429, headers: { "Content-Type": "application/json" } }
+            );
+        } else if (groqLimited && google) {
+            data.append({ type: 'thinking', step: 'Switching to backup model...' });
+        }
+
+        // 1. Token budget check
         const budgetIdentifier = `tokens:tanmay`;
         const budget = await dailyBudget.limit(budgetIdentifier);
-        if (!budget.success) {
+        if (!budget.success && !groqLimited) {
+            // Only enforce dailyBudget if we haven't already marked Groq as limited
+            // If it is limited, we're on Gemini which might have different rules
             return new Response(
                 JSON.stringify({
                     error: "Daily token budget exhausted. We must wait for the next cycle, sir.",
@@ -43,7 +59,7 @@ export async function POST(req: Request) {
             );
         }
 
-        // 1. Rate limiting check
+        // 2. Rate limiting check
         const identifier = `chat:tanmay`;
         const { success, limit, remaining, reset } = await toolRatelimit.limit(identifier);
 
@@ -108,12 +124,17 @@ When Tanmay shares an image:
 
         const VISION_MODEL = 'llama-3.2-90b-vision-preview';
 
-        const model = hasImages 
+        const modelSelection = hasImages 
             ? VISION_MODEL 
             : (isSimpleMessage(latestMessage) ? FAST_MODEL : REASONING_MODEL);
 
+        // Selection with fallback
+        const model = (groqLimited && google)
+            ? google(GEMINI_MODEL)
+            : groq(modelSelection);
+
         const result = streamText({
-            model: groq(model),
+            model: model as any,
             system: systemPrompt,
             messages,
             tools,
@@ -179,6 +200,12 @@ When Tanmay shares an image:
         });
     } catch (error) {
         console.error("Chat route catastrophic error:", error);
+        
+        const message = error instanceof Error ? error.message.toLowerCase() : '';
+        if (message.includes('rate_limit') || message.includes('429') || message.includes('quota')) {
+            await markGroqLimited();
+        }
+
         data.close();
         // Return a valid stream with error message so the UI doesn't hang
         return new Response(

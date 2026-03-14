@@ -12,6 +12,7 @@
     "register-webhook": "npx ts-node --project tsconfig.json -e \"require('dotenv').config({path:'.env.local'}); require('./scripts/register-telegram-webhook.ts')\""
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.43",
     "@ai-sdk/groq": "1.1.9",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-tooltip": "^1.2.8",

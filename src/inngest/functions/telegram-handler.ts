@@ -1,7 +1,7 @@
 import { inngest } from '@/inngest/client'
 import { env } from '@/lib/env'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { groq, REASONING_MODEL, FAST_MODEL } from '@/lib/groq/client'
+import { groq, google, REASONING_MODEL, FAST_MODEL, GEMINI_MODEL, isGroqLimited, markGroqLimited } from '@/lib/groq/client'
 import { generateText, type CoreMessage } from 'ai'
 import { getErrorMessage } from '@/lib/errors/messages'
 import { assembleContext } from '@/lib/memory/context-assembler'
@@ -96,11 +96,19 @@ export const telegramHandler = inngest.createFunction(
     const messageId = message.message_id
     const sessionId = `telegram_${chatId}`
 
-    // 0. Token budget check
+    // 0. Check if Groq is already known to be limited
+    const groqLimited = await isGroqLimited();
+
+    // 1. Token budget check
     const budget = await dailyBudget.limit(`tokens:tanmay`)
-    if (!budget.success) {
+    if (!budget.success && !groqLimited) {
       await sendMessage(chatId, "Daily token budget exhausted. We must wait for the next cycle, sir.")
       return { error: 'Budget exhausted' }
+    }
+
+    if (groqLimited && !google) {
+      await sendMessage(chatId, "Daily token limit hit. Resets at midnight IST.")
+      return { error: 'Groq limited, no fallback' }
     }
 
     // Start typing indicator
@@ -202,12 +210,16 @@ export const telegramHandler = inngest.createFunction(
 
       // Generate response
       const result = await step.run("generate-response", async () => {
-        const model = imageBase64 
+        const modelSelection = imageBase64 
           ? VISION_MODEL 
           : (isSimpleMessage(messageText) ? FAST_MODEL : REASONING_MODEL);
 
+        const model = (groqLimited && google)
+          ? google(GEMINI_MODEL)
+          : groq(modelSelection);
+
         const { text } = await generateText({
-          model: groq(model),
+          model: model as any,
           system: systemPrompt,
           messages,
           tools,
@@ -264,6 +276,12 @@ export const telegramHandler = inngest.createFunction(
     } catch (error) {
       clearInterval(typingInterval)
       console.error('Telegram handler error:', error)
+
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      if (message.includes('rate_limit') || message.includes('429') || message.includes('quota')) {
+        await markGroqLimited();
+      }
+
       await sendReaction(chatId, messageId, '⚡')
       await sendMessage(chatId, getErrorMessage(error))
       throw error // Let Inngest handle the retry
