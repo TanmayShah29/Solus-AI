@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 
 interface Memory {
   id: string
@@ -27,24 +26,14 @@ export default function MemoryPage() {
 
   useEffect(() => {
     async function load() {
-      const supabase = createClient()
-      const [memoriesRes, factsRes] = await Promise.allSettled([
-        supabase
-          .from('memories')
-          .select('id, content, source, created_at')
-          .eq('user_id', 'tanmay')
-          .order('created_at', { ascending: false })
-          .limit(100),
-        supabase
-          .from('knowledge_facts')
-          .select('id, entity, value, confidence, created_at')
-          .eq('user_id', 'tanmay')
-          .order('confidence', { ascending: false })
-          .limit(100),
-      ])
-
-      if (memoriesRes.status === 'fulfilled') setMemories(memoriesRes.value.data ?? [])
-      if (factsRes.status === 'fulfilled') setFacts(factsRes.value.data ?? [])
+      const res = await fetch('/api/dashboard/memory', {
+        headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setMemories(data.memories ?? [])
+        setFacts(data.facts ?? [])
+      }
       setLoading(false)
     }
     load()

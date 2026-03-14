@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 
 interface Task {
   id: string
@@ -21,14 +20,13 @@ export default function TasksPage() {
 
   useEffect(() => {
     async function load() {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('user_id', 'tanmay')
-        .order('created_at', { ascending: false })
-        .limit(50)
-      setTasks(data ?? [])
+      const res = await fetch('/api/dashboard/tasks', {
+        headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setTasks(data.tasks ?? [])
+      }
       setLoading(false)
     }
     load()

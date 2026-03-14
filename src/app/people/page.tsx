@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 
 interface Person {
   id: string
@@ -19,13 +18,13 @@ export default function PeoplePage() {
 
   useEffect(() => {
     async function load() {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('people')
-        .select('*')
-        .eq('user_id', 'tanmay')
-        .order('last_discussed', { ascending: false, nullsFirst: false })
-      setPeople(data ?? [])
+      const res = await fetch('/api/dashboard/people', {
+        headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setPeople(data.people ?? [])
+      }
       setLoading(false)
     }
     load()
