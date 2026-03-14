@@ -3,7 +3,7 @@
 > This file is maintained autonomously by Solus.
 > After every significant conversation, Solus extracts key facts and updates this file via GitHub.
 > Format: entity → attribute → value. Add new facts. Never delete old ones unless explicitly corrected.
-> Last updated: 14/3/2026, 12:39:03 pm IST
+> Last updated: 14/3/2026, 2:13:42 pm IST
 
 ---
 
@@ -21,6 +21,9 @@
 <!-- Added 14/3/2026, 12:39:03 pm IST -->
 - Favourite food is dal baati churma
 - Hates mornings
+
+<!-- Added 14/3/2026, 2:13:42 pm IST -->
+- You are a 6th semester Computer Engineering student in Kalol, Gujarat.
 
 ## Projects
 
