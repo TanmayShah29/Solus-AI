@@ -63,7 +63,7 @@ async function getTelegramHistory(chatId: number, limit = 10): Promise<CoreMessa
 export const telegramHandler = inngest.createFunction(
     { id: "telegram-handler", concurrency: 1 },
     { event: "telegram/message.received" },
-    async ({ event, step }) => {
+    async ({ event, step }: { event: any, step: any }) => {
         const { message, chatId, messageId, telegramUserId } = event.data
 
         const typingInterval = setInterval(() => sendTypingIndicator(chatId), 4000)
