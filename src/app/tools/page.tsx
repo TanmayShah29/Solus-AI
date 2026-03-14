@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 
 interface Tool {
   id: string
@@ -28,13 +27,13 @@ export default function ToolsPage() {
 
   useEffect(() => {
     async function load() {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('tools')
-        .select('*')
-        .order('name')
-
-      setTools(data ?? [])
+      const res = await fetch('/api/dashboard/tools', {
+        headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setTools(data.tools ?? [])
+      }
 
       // Fetch telemetry
       try {

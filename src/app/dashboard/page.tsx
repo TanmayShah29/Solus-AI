@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 
 interface Stats {
   totalMemories: number
@@ -19,28 +18,13 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function loadStats() {
-      const supabase = createClient()
-
-      const [memories, conversations, tasks, goals, executions, recentMemories, recentExecutions] =
-        await Promise.allSettled([
-          supabase.from('memories').select('*', { count: 'exact', head: true }).eq('user_id', 'tanmay'),
-          supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('user_id', 'tanmay'),
-          supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('user_id', 'tanmay').eq('status', 'pending'),
-          supabase.from('goals').select('*', { count: 'exact', head: true }).eq('user_id', 'tanmay').eq('status', 'active'),
-          supabase.from('tool_executions').select('*', { count: 'exact', head: true }).eq('user_id', 'tanmay'),
-          supabase.from('memories').select('content, created_at').eq('user_id', 'tanmay').order('created_at', { ascending: false }).limit(5),
-          supabase.from('tool_executions').select('tool_name, success, duration_ms, created_at').eq('user_id', 'tanmay').order('created_at', { ascending: false }).limit(10),
-        ])
-
-      setStats({
-        totalMemories: memories.status === 'fulfilled' ? (memories.value.count ?? 0) : 0,
-        totalConversations: conversations.status === 'fulfilled' ? (conversations.value.count ?? 0) : 0,
-        activeTasks: tasks.status === 'fulfilled' ? (tasks.value.count ?? 0) : 0,
-        activeGoals: goals.status === 'fulfilled' ? (goals.value.count ?? 0) : 0,
-        totalToolExecutions: executions.status === 'fulfilled' ? (executions.value.count ?? 0) : 0,
-        recentMemories: recentMemories.status === 'fulfilled' ? (recentMemories.value.data ?? []) : [],
-        recentExecutions: recentExecutions.status === 'fulfilled' ? (recentExecutions.value.data ?? []) : [],
+      const res = await fetch('/api/dashboard/stats', {
+        headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` }
       })
+      if (res.ok) {
+        const data = await res.json()
+        setStats(data)
+      }
       setLoading(false)
     }
 
