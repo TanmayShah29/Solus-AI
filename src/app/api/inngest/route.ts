@@ -13,6 +13,7 @@ import { syncClaudeMd } from "@/inngest/functions/sync-claude-md";
 import { proactiveSuggestions } from "@/inngest/functions/proactive-suggestions";
 import { goalNudge } from "@/inngest/functions/goal-nudge";
 import { memorySync } from "@/inngest/functions/memory-sync";
+import { telegramHandler } from "@/inngest/functions/telegram-handler";
 
 export const { GET, POST, PUT } = serve({
     client: inngest,
@@ -30,5 +31,6 @@ export const { GET, POST, PUT } = serve({
         proactiveSuggestions,
         goalNudge,
         memorySync,
+        telegramHandler,
     ],
 });
