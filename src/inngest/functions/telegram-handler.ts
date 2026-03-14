@@ -140,20 +140,28 @@ When Tanmay shares an image:
             const tools = loadSkills(null)
             const VISION_MODEL = 'llama-3.2-90b-vision-preview'
             
-            const userContent: any = imageBase64
+            const historyMessages = (history as any[]).map(m => ({
+                role: m.role,
+                content: m.content
+            }))
+
+            const userContentPart: any = imageBase64
                 ? [
                     { type: 'image' as const, image: imageBase64, mimeType: imageMimeType },
                     { type: 'text' as const, text: userMessage },
                 ]
                 : userMessage;
 
-            const messages: any[] = [...(history as any[]), { role: 'user', content: userContent as any }];
+            const messages: CoreMessage[] = [
+                ...historyMessages,
+                { role: 'user', content: userContentPart }
+            ] as any[];
 
             let toolUsed = false
             const result = streamText({
                 model: groq(imageBase64 ? VISION_MODEL : REASONING_MODEL),
                 system: systemPrompt,
-                messages: messages as CoreMessage[],
+                messages: messages as any,
                 tools,
                 maxSteps: 8,
                 onChunk: async ({ chunk }) => {
