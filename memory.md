@@ -3,7 +3,7 @@
 > This file is maintained autonomously by Solus.
 > After every significant conversation, Solus extracts key facts and updates this file via GitHub.
 > Format: entity → attribute → value. Add new facts. Never delete old ones unless explicitly corrected.
-> Last updated: 14/3/2026, 2:56:39 pm IST
+> Last updated: 14/3/2026, 3:04:06 pm IST
 
 ---
 
@@ -24,6 +24,9 @@
 
 <!-- Added 14/3/2026, 2:13:42 pm IST -->
 - You are a 6th semester Computer Engineering student in Kalol, Gujarat.
+
+<!-- Added 14/3/2026, 3:04:06 pm IST -->
+- You want to make Solus better.
 
 ## Projects
 
