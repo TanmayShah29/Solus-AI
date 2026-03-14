@@ -164,7 +164,7 @@ When Tanmay shares an image:
                 },
             })
 
-            const { text } = await result
+            const text = await result.text;
             clearInterval(typingInterval)
 
             // Send response
