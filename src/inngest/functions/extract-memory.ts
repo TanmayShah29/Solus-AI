@@ -58,7 +58,67 @@ Assistant: ${assistantResponse}`;
 
         const conversationText = `User: ${userMessage}\nAssistant: ${assistantResponse}`;
 
-        // Step 3: Judge each extracted fact
+        // Step 3: Cross-session episodic linking
+        await step.run("episodic-linking", async () => {
+            const { supabaseAdmin: supabase } = await import("@/lib/supabase/admin");
+
+            // Fetch last 20 memories for context
+            const { data: recentMemories } = await supabase
+                .from('memories')
+                .select('id, content, created_at')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(20);
+
+            if (!recentMemories || recentMemories.length === 0) return;
+
+            const linkingPrompt = `
+You are analyzing a new conversation to find connections to past memories.
+
+New conversation:
+${conversationText}
+
+Recent memories (last 20):
+${recentMemories.map(m => `- ${m.content} (${m.created_at})`).join('\n')}
+
+Identify:
+1. Which past memories does this conversation follow up on or relate to?
+2. What has changed or progressed since those memories?
+3. Is this a continuation of an ongoing topic?
+
+Respond strictly in JSON:
+{
+  "related_memory_ids": ["id1", "id2"],
+  "relationship": "follow-up" | "contradiction" | "progress" | "new_topic",
+  "continuity_note": "One sentence describing how this connects to past context"
+}
+
+If no clear connections, respond: { "related_memory_ids": [], "relationship": "new_topic", "continuity_note": "" }
+`;
+
+            const { text: linkingText } = await generateText({
+                model: groq(FAST_MODEL),
+                prompt: linkingPrompt,
+            });
+
+            try {
+                const linking = JSON.parse(linkingText.trim().replace(/```json\n?|\n?```/g, ''));
+
+                if (linking.related_memory_ids?.length > 0 && linking.continuity_note) {
+                    console.log(`[Inngest] Found continuity: ${linking.continuity_note}`);
+                    // Store the continuity note as a special memory
+                    await supabase.from('memories').insert({
+                        user_id: userId,
+                        content: `[CONTINUITY] ${linking.continuity_note}`,
+                        source: 'reflection',
+                    });
+                }
+            } catch (e) {
+                console.error("[Inngest] Linking JSON parse error:", e, linkingText);
+            }
+        });
+
+        // Step 4: Judge each extracted fact
         await step.run("judge-facts", async () => {
             console.log(`[Inngest] Judging ${extractedFacts.length} facts...`);
             const { judgeFact } = await import("@/lib/reflection/judge");

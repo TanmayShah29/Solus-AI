@@ -1,0 +1,14 @@
+{
+  "name": "google_drive",
+  "description": "Search and read files in Tanmay's Google Drive. Actions: search_files, read_file.",
+  "category": "productivity",
+  "auto_approve": true,
+  "worker_url": "/api/tools/google-drive",
+  "parameters": {
+    "action": { "type": "string", "required": true, "description": "Action to perform", "enum": ["search_files", "read_file"] },
+    "query": { "type": "string", "required": false, "description": "Search term" },
+    "file_id": { "type": "string", "required": false, "description": "Drive file ID" },
+    "max_results": { "type": "number", "required": false }
+  },
+  "thinking_message": "Searching Google Drive..."
+}

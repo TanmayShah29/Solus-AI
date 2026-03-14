@@ -14,11 +14,13 @@ export type ToolResult = {
     summary: string;
     error?: string;
     executionMs: number;
+    retry_suggestion?: string;
+    args_used?: Record<string, unknown>;
 };
 
-const BASE_URL = process.env.VERCEL_URL
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000";
+    : "http://localhost:3000");
 
 /**
  * Executes a single tool by calling its Next.js API route.
@@ -26,8 +28,10 @@ const BASE_URL = process.env.VERCEL_URL
  */
 export async function executeTool(
     toolName: string,
-    args: Record<string, unknown>
+    args: Record<string, unknown>,
+    retryCount = 0
 ): Promise<ToolResult> {
+    const MAX_RETRIES = 2;
     const startTime = Date.now();
     const toolUrl = `${BASE_URL}/api/tools/${toolName.replace(/_/g, "-")}`;
 
@@ -47,13 +51,22 @@ export async function executeTool(
         const data = await response.json();
         const duration_ms = Date.now() - startTime;
 
+        const success = response.ok && data.success !== false;
+
         const result: ToolResult = {
-            success: response.ok && data.success !== false,
+            success,
             result: data.result ?? data,
             summary: data.summary ?? (response.ok ? "Tool executed successfully" : "Tool failed"),
             error: data.error,
             executionMs: duration_ms,
         };
+
+        // If tool failed and we haven't exhausted retries, return error with context
+        // so the LLM kernel can self-correct and retry
+        if (!success && retryCount < MAX_RETRIES) {
+            result.retry_suggestion = `Tool ${toolName} failed with: "${data.error || 'Unknown error'}". Analyze the error, correct the arguments, and try again.`;
+            result.args_used = args;
+        }
 
         // Log to Supabase (Fire and forget, don't block response)
         logToolExecution(toolName, args, result).catch(console.error);
@@ -61,13 +74,20 @@ export async function executeTool(
         return result;
     } catch (error: unknown) {
         const duration_ms = Date.now() - startTime;
+        const message = error instanceof Error ? error.message : String(error);
+
         const result: ToolResult = {
             success: false,
             result: null,
             summary: "Tool failed",
-            error: error instanceof Error ? error.message : String(error),
+            error: message,
             executionMs: duration_ms,
         };
+
+        if (retryCount < MAX_RETRIES) {
+            result.retry_suggestion = `Tool ${toolName} threw: "${message}". Check the arguments and retry.`;
+            result.args_used = args;
+        }
 
         logToolExecution(toolName, args, result).catch(console.error);
         return result;

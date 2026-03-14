@@ -1,0 +1,11 @@
+{
+  "name": "weather",
+  "description": "Get current weather and 3-day forecast for any city.",
+  "category": "personal",
+  "auto_approve": true,
+  "worker_url": "/api/tools/weather",
+  "parameters": {
+    "city": { "type": "string", "required": true, "description": "City name e.g. Mumbai, London, New York" }
+  },
+  "thinking_message": "Checking weather in {city}..."
+}

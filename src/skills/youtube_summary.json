@@ -1,0 +1,11 @@
+{
+  "name": "youtube_summary",
+  "description": "Get a summary of any YouTube video.",
+  "category": "research",
+  "auto_approve": true,
+  "worker_url": "/api/tools/youtube-summary",
+  "parameters": {
+    "url": { "type": "string", "required": true, "description": "The YouTube URL" }
+  },
+  "thinking_message": "Summarising YouTube video..."
+}

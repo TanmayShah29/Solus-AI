@@ -6,7 +6,8 @@ import { toolRatelimit } from "@/lib/redis/client";
 
 import { getContextBlock } from "@/lib/memory/context-assembler";
 import { inngest } from "@/inngest/client";
-import { getSolusTools, buildSystemPrompt, type ContextBlock } from "@/lib/kernel";
+import { buildSystemPrompt, type ContextBlock } from "@/lib/kernel";
+import { loadSkills } from "@/lib/skills/loader";
 
 // Allow up to 30 s on Vercel (streaming responses need more than the 10 s default).
 export const maxDuration = 30;
@@ -51,16 +52,34 @@ export async function POST(req: Request) {
             currentTime: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
         };
 
-        const systemPrompt = buildSystemPrompt(context);
-        const tools = getSolusTools(data);
+        const systemPrompt = buildSystemPrompt(context) + `
+
+## Vision
+
+When Tanmay shares an image:
+- Describe what you see concisely and relevantly
+- If it's code: identify the language, spot issues, suggest improvements
+- If it's a screenshot: describe what's happening on screen
+- If it's a document: extract the key information
+- If it's a photo: describe it naturally
+- Never say "I can see an image" — just respond to what's in it`;
+
+        const tools = loadSkills(data);
+
+        const hasImages = messages.some((m: any) =>
+            Array.isArray(m.content) && m.content.some((c: any) => c.type === 'image')
+        ) || messages.some((m: any) => m.experimental_attachments?.some((a: any) => a.contentType.startsWith('image/')));
+
+        const VISION_MODEL = 'llama-3.2-90b-vision-preview';
 
         const result = streamText({
-            model: groq(REASONING_MODEL),
+            model: groq(hasImages ? VISION_MODEL : REASONING_MODEL),
             system: systemPrompt,
             messages,
             tools,
-            maxSteps: 5,
+            maxSteps: 8,
             onFinish: async ({ text, usage }) => {
+
                 try {
                     const session_id = crypto.randomUUID(); // temporary until we add proper sessions
 

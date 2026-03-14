@@ -1,0 +1,14 @@
+{
+  "name": "gmail_read",
+  "description": "Read Tanmay's Gmail inbox. Actions: list_inbox, search_emails, read_thread.",
+  "category": "productivity",
+  "auto_approve": true,
+  "worker_url": "/api/tools/gmail-read",
+  "parameters": {
+    "action": { "type": "string", "required": true, "description": "Action to perform", "enum": ["list_inbox", "search_emails", "read_thread"] },
+    "query": { "type": "string", "required": false, "description": "Gmail search query" },
+    "max_results": { "type": "number", "required": false },
+    "thread_id": { "type": "string", "required": false }
+  },
+  "thinking_message": "Checking Gmail..."
+}

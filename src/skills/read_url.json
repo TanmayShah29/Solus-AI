@@ -1,0 +1,12 @@
+{
+  "name": "read_url",
+  "description": "Fetch and extract content from any URL. Use when Tanmay shares a link.",
+  "category": "research",
+  "auto_approve": true,
+  "worker_url": "/api/tools/read-url",
+  "parameters": {
+    "url": { "type": "string", "required": true, "description": "The URL to read" },
+    "max_length": { "type": "number", "required": false, "description": "Max characters to extract, default 3000" }
+  },
+  "thinking_message": "Reading {url}..."
+}

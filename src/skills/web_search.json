@@ -1,0 +1,12 @@
+{
+  "name": "web_search",
+  "description": "Search the web for current information, recent events, news, facts, or anything not in memory. Use freely whenever Tanmay asks about something that requires up-to-date information.",
+  "category": "research",
+  "auto_approve": true,
+  "worker_url": "/api/tools/web-search",
+  "parameters": {
+    "query": { "type": "string", "required": true, "description": "The search query" },
+    "max_results": { "type": "number", "required": false, "description": "Number of results, default 5" }
+  },
+  "thinking_message": "Searching the web for \"{query}\"..."
+}

@@ -73,9 +73,20 @@ export function ChatInterface() {
                 <ThinkingIndicator steps={thinkingSteps} />
 
                 <PromptInputBox
-                    onSend={(message) => {
-                        if (message.trim()) {
-                            append({ role: 'user', content: message });
+                    onSend={async (message, files) => {
+                        const trimmed = message.trim();
+                        if (trimmed || (files && files.length > 0)) {
+                            const attachments = files?.map(file => ({
+                                name: file.name,
+                                contentType: file.type,
+                                url: URL.createObjectURL(file), // Temporary URL for preview
+                            }));
+
+                            append({ 
+                                role: 'user', 
+                                content: trimmed,
+                                experimental_attachments: attachments as any
+                            });
                         }
                     }}
                     isLoading={isLoading}
