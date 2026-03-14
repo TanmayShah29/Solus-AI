@@ -147,13 +147,13 @@ When Tanmay shares an image:
                 ]
                 : userMessage;
 
-            const messages: CoreMessage[] = [...history, { role: 'user' as const, content: userContent as any }]
+            const messages: any[] = [...(history as any[]), { role: 'user', content: userContent as any }];
 
             let toolUsed = false
             const result = streamText({
                 model: groq(imageBase64 ? VISION_MODEL : REASONING_MODEL),
                 system: systemPrompt,
-                messages,
+                messages: messages as CoreMessage[],
                 tools,
                 maxSteps: 8,
                 onChunk: async ({ chunk }) => {
