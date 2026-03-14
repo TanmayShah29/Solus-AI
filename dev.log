@@ -133,3 +133,19 @@ Groq Whisper error: {"error":{"message":"file is empty","type":"invalid_request_
  GET /dashboard 200 in 1490ms (compile: 169ms, render: 1321ms)
  PUT /api/inngest 200 in 1975ms (compile: 1745ms, render: 230ms)
  HEAD /dashboard 200 in 97ms (compile: 16ms, render: 81ms)
+ GET / 200 in 53ms (compile: 20ms, render: 33ms)
+ GET / 200 in 512ms (compile: 160ms, render: 352ms)
+ GET /dashboard 200 in 1901ms (compile: 893ms, render: 1008ms)
+ GET /memory 200 in 157ms (compile: 134ms, render: 24ms)
+ GET /people 200 in 127ms (compile: 108ms, render: 20ms)
+ GET /tasks 200 in 97ms (compile: 76ms, render: 20ms)
+ GET /tools 200 in 117ms (compile: 100ms, render: 17ms)
+ GET /traces 200 in 2.5s (compile: 2.2s, render: 238ms)
+ GET /traces 200 in 208ms (compile: 9ms, render: 199ms)
+ GET /traces 200 in 126ms (compile: 13ms, render: 113ms)
+ GET /traces 200 in 65ms (compile: 10ms, render: 54ms)
+ GET /tools 200 in 26ms (compile: 6ms, render: 20ms)
+ GET /tasks 200 in 27ms (compile: 5ms, render: 22ms)
+✓ Compiled in 649ms
+✓ Compiled in 112ms
+✓ Compiled in 202ms

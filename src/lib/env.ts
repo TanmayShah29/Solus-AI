@@ -58,6 +58,7 @@ const envSchema = z.object({
         .default("true"),
     LANGCHAIN_PROJECT: z.string().min(1).default("solus"),
     NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
+    NEXT_PUBLIC_API_SECRET_TOKEN: z.string().optional(),
     MORNING_BRIEF_CRON: z.string().min(1).default("30 0 * * *"),
 
     // ── Future phases — optional, will not throw ─────────────────────────────
@@ -97,9 +98,14 @@ function validateEnv() {
     const isServer = typeof window === 'undefined';
 
     if (!isServer) {
-        // In the browser, Next.js only injects NEXT_PUBLIC_ variables.
-        // We skip full validation to prevent crashes in client components.
-        return process.env as unknown as Env;
+        // In the browser, Next.js performs static replacement of process.env.NEXT_PUBLIC_...
+        // We manually map them here to ensure they are available in the returned object.
+        return {
+            NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+            NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+            NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+            NEXT_PUBLIC_API_SECRET_TOKEN: process.env.NEXT_PUBLIC_API_SECRET_TOKEN,
+        } as unknown as Env;
     }
 
     const parsed = envSchema.safeParse(process.env);

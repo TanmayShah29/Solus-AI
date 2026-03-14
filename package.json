@@ -6,7 +6,7 @@
     "dev": "concurrently --kill-others-on-fail --names \"next,inngest\" --prefix-colors \"blue,yellow\" \"next dev\" \"npx inngest-cli@latest dev -u http://localhost:3000/api/inngest\"",
     "dev:next": "next dev",
     "dev:inngest": "npx inngest-cli@latest dev -u http://localhost:3000/api/inngest",
-    "build": "next build",
+    "build": "NODE_OPTIONS='--max-old-space-size=4096' next build",
     "start": "next start",
     "lint": "next lint",
     "register-webhook": "npx ts-node --project tsconfig.json -e \"require('dotenv').config({path:'.env.local'}); require('./scripts/register-telegram-webhook.ts')\""
