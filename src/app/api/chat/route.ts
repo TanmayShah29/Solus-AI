@@ -1,8 +1,8 @@
 import { streamText, StreamData } from "ai";
-import { groq, REASONING_MODEL } from "@/lib/groq/client";
+import { groq, REASONING_MODEL, FAST_MODEL } from "@/lib/groq/client";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { env } from "@/lib/env";
-import { toolRatelimit } from "@/lib/redis/client";
+import { toolRatelimit, dailyBudget } from "@/lib/redis/client";
 
 import { assembleContext } from "@/lib/memory/context-assembler";
 import { inngest } from "@/inngest/client";
@@ -22,9 +22,27 @@ async function isFirstConversation(userId: string): Promise<boolean> {
     return (count ?? 0) === 0
 }
 
+const isSimpleMessage = (text: string) => {
+    const words = text.trim().split(' ').length
+    const hasComplexity = /\?|search|find|check|calendar|email|weather|remind|remember|news|tell me|what is|how to/i.test(text)
+    return words < 20 && !hasComplexity
+}
+
 export async function POST(req: Request) {
     const data = new StreamData();
     try {
+        // 0. Token budget check
+        const budgetIdentifier = `tokens:tanmay`;
+        const budget = await dailyBudget.limit(budgetIdentifier);
+        if (!budget.success) {
+            return new Response(
+                JSON.stringify({
+                    error: "Daily token budget exhausted. We must wait for the next cycle, sir.",
+                }),
+                { status: 429, headers: { "Content-Type": "application/json" } }
+            );
+        }
+
         // 1. Rate limiting check
         const identifier = `chat:tanmay`;
         const { success, limit, remaining, reset } = await toolRatelimit.limit(identifier);
@@ -47,7 +65,10 @@ export async function POST(req: Request) {
             );
         }
 
-        const { messages } = await req.json();
+        const { messages: rawMessages } = await req.json();
+
+        // Load maximum 5 conversation history messages
+        const messages = rawMessages.slice(-5);
 
         // Get the latest user message to use as the memory query
         const latestMessage = messages[messages.length - 1]?.content ?? "";
@@ -87,12 +108,16 @@ When Tanmay shares an image:
 
         const VISION_MODEL = 'llama-3.2-90b-vision-preview';
 
+        const model = hasImages 
+            ? VISION_MODEL 
+            : (isSimpleMessage(latestMessage) ? FAST_MODEL : REASONING_MODEL);
+
         const result = streamText({
-            model: groq(hasImages ? VISION_MODEL : REASONING_MODEL),
+            model: groq(model),
             system: systemPrompt,
             messages,
             tools,
-            maxSteps: 8,
+            maxSteps: 5,
             onFinish: async ({ text, usage }) => {
 
                 try {

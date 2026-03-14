@@ -1,14 +1,21 @@
 import { inngest } from '@/inngest/client'
 import { env } from '@/lib/env'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { groq, REASONING_MODEL } from '@/lib/groq/client'
+import { groq, REASONING_MODEL, FAST_MODEL } from '@/lib/groq/client'
 import { generateText, type CoreMessage } from 'ai'
 import { getErrorMessage } from '@/lib/errors/messages'
 import { assembleContext } from '@/lib/memory/context-assembler'
 import { buildSystemPrompt } from '@/lib/kernel/index'
 import { loadSkills } from '@/lib/skills/loader'
+import { dailyBudget } from '@/lib/redis/client'
 
 const VISION_MODEL = 'llama-3.2-90b-vision-preview'
+
+const isSimpleMessage = (text: string) => {
+  const words = text.trim().split(' ').length
+  const hasComplexity = /\?|search|find|check|calendar|email|weather|remind|remember|news|tell me|what is|how to/i.test(text)
+  return words < 20 && !hasComplexity
+}
 
 async function sendTyping(chatId: number) {
   await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendChatAction`, {
@@ -89,6 +96,13 @@ export const telegramHandler = inngest.createFunction(
     const messageId = message.message_id
     const sessionId = `telegram_${chatId}`
 
+    // 0. Token budget check
+    const budget = await dailyBudget.limit(`tokens:tanmay`)
+    if (!budget.success) {
+      await sendMessage(chatId, "Daily token budget exhausted. We must wait for the next cycle, sir.")
+      return { error: 'Budget exhausted' }
+    }
+
     // Start typing indicator
     await sendTyping(chatId)
 
@@ -160,7 +174,7 @@ export const telegramHandler = inngest.createFunction(
 
       // Load conversation history
       const history = await step.run("get-history", async () => {
-        return getTelegramHistory(chatId, 10)
+        return getTelegramHistory(chatId, 5)
       })
 
       // Build system prompt and tools
@@ -188,12 +202,16 @@ export const telegramHandler = inngest.createFunction(
 
       // Generate response
       const result = await step.run("generate-response", async () => {
+        const model = imageBase64 
+          ? VISION_MODEL 
+          : (isSimpleMessage(messageText) ? FAST_MODEL : REASONING_MODEL);
+
         const { text } = await generateText({
-          model: groq(imageBase64 ? VISION_MODEL : REASONING_MODEL),
+          model: groq(model),
           system: systemPrompt,
           messages,
           tools,
-          maxSteps: 8,
+          maxSteps: 5,
         })
         return text
       })

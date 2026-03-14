@@ -13,7 +13,7 @@ export type Memory = {
 export async function retrieveMemories(
     query: string,
     userId: string,
-    limit = 8
+    limit = 5
 ): Promise<Memory[]> {
     const embedding = await embedText(query);
 

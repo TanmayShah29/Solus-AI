@@ -59,8 +59,9 @@ export async function getMemoryFile(): Promise<string> {
 
   try {
     const { content } = await getFile('memory.md')
-    memoryCache = { content, cachedAt: Date.now() }
-    return content
+    const truncated = content.slice(0, 2000)
+    memoryCache = { content: truncated, cachedAt: Date.now() }
+    return truncated
   } catch {
     return ''
   }
