@@ -19,7 +19,7 @@ export function MessageList({ messages }: { messages: Message[] }) {
     }
 
     return (
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        <div className="space-y-6">
             {messages.map((msg) => {
                 const isUser = msg.role === "user";
 
@@ -29,10 +29,10 @@ export function MessageList({ messages }: { messages: Message[] }) {
                         className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                     >
                         <div
-                            className={`max-w-[80%] rounded-2xl px-5 py-3 shadow-sm ${isUser
-                                    ? "bg-slate-900 text-white bg-slate-100 text-slate-100"
-                                    : "bg-slate-900 text-slate-100 border border-slate-200 bg-slate-900 text-slate-100 border-slate-800"
-                                }`}
+                            className={isUser
+                                ? "ml-auto max-w-[80%] px-4 py-2 rounded-2xl bg-white/10 backdrop-blur-md text-white text-sm border border-white/10"
+                                : "mr-auto max-w-[80%] px-4 py-2 rounded-2xl bg-black/40 backdrop-blur-md text-white/90 text-sm border border-white/5"
+                            }
                         >
                             <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                         </div>
