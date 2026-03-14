@@ -7,6 +7,7 @@
 
 import { env } from "@/lib/env";
 import { traceable } from "langsmith/traceable";
+import { getCached, setCached } from '@/lib/redis/client';
 
 function describeWeather(code: number): string {
     if (code === 0) return "Clear sky";
@@ -37,6 +38,12 @@ const POST_HANDLER = async (req: Request) => {
                 { success: false, summary: "Missing city parameter", error: "Bad Request" },
                 { status: 400 }
             );
+        }
+
+        const cacheKey = `weather:${city.toLowerCase()}`;
+        const cached = await getCached<any>(cacheKey);
+        if (cached) {
+            return Response.json({ ...cached, cached: true, duration_ms: Date.now() - start });
         }
 
         // Step 1 — Geocode: Convert city name to coordinates
@@ -78,7 +85,7 @@ const POST_HANDLER = async (req: Request) => {
             throw new Error("Failed to retrieve current weather data");
         }
 
-        return Response.json({
+        const result = {
             success: true,
             result: {
                 city: `${name}, ${country}`,
@@ -94,6 +101,12 @@ const POST_HANDLER = async (req: Request) => {
                 })),
             },
             summary: `${name}: ${current.temperature_2m}°C, ${describeWeather(current.weather_code)}. Wind: ${current.wind_speed_10m} km/h.`,
+        };
+
+        await setCached(cacheKey, result, 30 * 60); // 30 minute TTL
+
+        return Response.json({
+            ...result,
             duration_ms: Date.now() - start,
         });
     } catch (error: any) {

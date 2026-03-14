@@ -4,15 +4,25 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { env } from "@/lib/env";
 import { toolRatelimit } from "@/lib/redis/client";
 
-import { getContextBlock } from "@/lib/memory/context-assembler";
+import { assembleContext } from "@/lib/memory/context-assembler";
 import { inngest } from "@/inngest/client";
-import { buildSystemPrompt, type ContextBlock } from "@/lib/kernel";
+import { buildSystemPrompt, SOLUS_SYSTEM_PROMPT } from "@/lib/kernel";
 import { loadSkills } from "@/lib/skills/loader";
+import { getErrorMessage } from "@/lib/errors/messages";
 
 // Allow up to 30 s on Vercel (streaming responses need more than the 10 s default).
 export const maxDuration = 30;
 
+async function isFirstConversation(userId: string): Promise<boolean> {
+    const { count } = await supabaseAdmin
+        .from('conversations')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+    return (count ?? 0) === 0
+}
+
 export async function POST(req: Request) {
+    const data = new StreamData();
     try {
         // 1. Rate limiting check
         const identifier = `chat:tanmay`;
@@ -37,22 +47,26 @@ export async function POST(req: Request) {
         }
 
         const { messages } = await req.json();
-        const data = new StreamData();
 
         // Get the latest user message to use as the memory query
         const latestMessage = messages[messages.length - 1]?.content ?? "";
 
-        // Fetch context data (memories, tasks, people)
-        const { memories, activeTasks, relevantPeople } = await getContextBlock(latestMessage);
+        // Fetch context data (memories, tasks, facts, memory.md)
+        const context = await assembleContext(env.MY_USER_ID, latestMessage);
 
-        const context: ContextBlock = {
-            memories,
-            activeTasks,
-            relevantPeople,
-            currentTime: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-        };
+        const firstTime = await isFirstConversation(env.MY_USER_ID);
 
-        const systemPrompt = buildSystemPrompt(context) + `
+        const systemPrompt = firstTime
+            ? `${SOLUS_SYSTEM_PROMPT}
+
+## Onboarding
+This is your first conversation with Tanmay. You don't know him yet.
+Ask him ONE question to start building context. Keep it natural — not a form.
+Good: "What are you working on right now?"
+Bad: "Please tell me your name, goals, and preferences."
+After he answers, ask one more follow-up. Then introduce yourself briefly and get to work.
+Save everything he tells you using the update_memory tool.`
+            : buildSystemPrompt(context) + `
 
 ## Vision
 
@@ -102,6 +116,16 @@ When Tanmay shares an image:
                         tokens_used: usage.totalTokens,
                     });
 
+                    // Fire quality scoring in background
+                    await inngest.send({
+                        name: 'solus/response.generated',
+                        data: {
+                            userMessage: messages[messages.length - 1]?.content ?? '',
+                            assistantResponse: text,
+                            sessionId: session_id,
+                        },
+                    })
+
                     // background memory extraction
                     await inngest.send({
                         name: "solus/turn.completed",
@@ -128,10 +152,18 @@ When Tanmay shares an image:
             },
         });
     } catch (error) {
-        console.error("Chat API Error:", error);
-        return Response.json(
-            { error: error instanceof Error ? error.message : "Unknown error" },
-            { status: 500 }
+        console.error("Chat route catastrophic error:", error);
+        data.close();
+        // Return a valid stream with error message so the UI doesn't hang
+        return new Response(
+            `data: ${JSON.stringify({ type: 'text', text: getErrorMessage(error) })}\n\ndata: [DONE]\n\n`,
+            {
+                headers: {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                },
+            }
         );
     }
 }

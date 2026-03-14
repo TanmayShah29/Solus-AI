@@ -2,6 +2,8 @@ import { retrieveMemories, type Memory } from "@/lib/memory/retrieve";
 import { redis, TTL } from '@/lib/redis/client'
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { env } from "@/lib/env";
+import { getMemoryFile } from '@/lib/github/client'
+import { type ContextBlock } from "@/lib/kernel";
 
 export type Task = {
     title: string;
@@ -16,77 +18,53 @@ export type Person = {
     notes?: string;
 };
 
-export async function assembleContext(query: string): Promise<string> {
-    const cacheKey = `solus:context:tanmay`
+export async function assembleContext(userId: string, query: string): Promise<ContextBlock> {
+    const results = await Promise.allSettled([
+        retrieveMemories(query, userId),
+        getKnowledgeFacts(userId),
+        getActiveTasks(userId),
+        getMemoryFile(),
+    ]);
 
-    // Try cache first
-    try {
-        const cached = await redis.get<string>(cacheKey)
-        if (cached) return cached
-    } catch {
-        // Cache miss or Redis error — fall through to Supabase
-    }
-
-    // Fetch from Supabase
-    const memories = await retrieveMemories(query, 5);
-
-    if (!memories || memories.length === 0) {
-        return "";
-    }
-
-    const memoryBullets = memories
-        .map((m: Memory) => {
-            const confidence = m.confidence.toFixed(2);
-            const date = new Date(m.created_at).toISOString().split("T")[0];
-            return `- ${m.content} (confidence: ${confidence}, from ${date})`;
-        })
-        .join("\n");
-
-    const context = `## What I remember that's relevant:\n${memoryBullets}`;
-
-    // Store in cache
-    try {
-        await redis.set(cacheKey, context, { ex: TTL.CONTEXT })
-    } catch {
-        // Cache write failed — not critical, continue
-    }
-
-    return context
-}
-
-export async function getContextBlock(query: string): Promise<{
-    memories: Memory[],
-    activeTasks: Task[],
-    relevantPeople: Person[]
-}> {
-    // 1. Fetch boosted memories
-    const memories = await retrieveMemories(query, 5);
-
-    // 2. Fetch active tasks
-    const { data: tasks } = await supabaseAdmin
-        .from('tasks')
-        .select('title, status, priority, deadline')
-        .eq('user_id', env.MY_USER_ID)
-        .in('status', ['pending', 'in_progress'])
-        .order('priority', { ascending: false });
-
-    // 3. Scan for people
-    const { data: allPeople } = await supabaseAdmin
-        .from('people')
-        .select('name, relationship, notes')
-        .eq('user_id', env.MY_USER_ID);
-
-    const relevantPeople = (allPeople || []).filter(p =>
-        query.toLowerCase().includes(p.name.toLowerCase())
-    );
+    const memories = results[0].status === 'fulfilled' ? results[0].value : [];
+    const knowledgeFacts = results[1].status === 'fulfilled' ? results[1].value : [];
+    const activeTasks = results[2].status === 'fulfilled' ? (results[2].value as Task[]) : [];
+    const memoryFile = results[3].status === 'fulfilled' ? results[3].value : '';
 
     return {
         memories,
-        activeTasks: (tasks || []) as Task[],
-        relevantPeople: relevantPeople as Person[]
+        knowledgeFacts,
+        activeTasks,
+        memoryFile,
+        currentTime: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
     };
 }
 
+async function getKnowledgeFacts(userId: string): Promise<any[]> {
+    try {
+        const { data } = await supabaseAdmin
+            .from('knowledge_facts')
+            .select('entity, value')
+            .eq('user_id', userId);
+        return data || [];
+    } catch {
+        return [];
+    }
+}
+
+async function getActiveTasks(userId: string): Promise<Task[]> {
+    try {
+        const { data } = await supabaseAdmin
+            .from('tasks')
+            .select('title, status, priority, deadline')
+            .eq('user_id', userId)
+            .in('status', ['pending', 'in_progress'])
+            .order('priority', { ascending: false });
+        return (data || []) as Task[];
+    } catch {
+        return [];
+    }
+}
 
 export async function invalidateContextCache(): Promise<void> {
     try {
@@ -94,17 +72,4 @@ export async function invalidateContextCache(): Promise<void> {
     } catch {
         // Non-critical
     }
-}
-
-export async function buildSystemPrompt(
-    basePrompt: string,
-    query: string
-): Promise<string> {
-    const context = await assembleContext(query);
-
-    if (!context) {
-        return basePrompt;
-    }
-
-    return `${basePrompt}\n\n${context}`;
 }

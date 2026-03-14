@@ -30,3 +30,19 @@ export const TTL = {
     SESSION: 60 * 60,     // 1 hour — session data
     TOOL: 5 * 60,      // 5 minutes — tool results
 } as const
+
+export async function getCached<T>(key: string): Promise<T | null> {
+    try {
+        return await redis.get<T>(key)
+    } catch {
+        return null
+    }
+}
+
+export async function setCached<T>(key: string, value: T, ttlSeconds: number): Promise<void> {
+    try {
+        await redis.set(key, value, { ex: ttlSeconds })
+    } catch {
+        // cache miss is acceptable — never crash for caching
+    }
+}
