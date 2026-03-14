@@ -1,10 +1,8 @@
 import { env } from '@/lib/env'
 
-const GITHUB_API = 'https://api.github.com'
-
 export async function getFile(path: string): Promise<{ content: string; sha: string }> {
   const response = await fetch(
-    `${GITHUB_API}/repos/${env.GITHUB_REPO}/contents/${path}`,
+    `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${path}`,
     {
       headers: {
         Authorization: `Bearer ${env.GITHUB_TOKEN}`,
@@ -29,7 +27,7 @@ export async function updateFile(
   const encoded = Buffer.from(content, 'utf-8').toString('base64')
 
   const response = await fetch(
-    `${GITHUB_API}/repos/${env.GITHUB_REPO}/contents/${path}`,
+    `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${path}`,
     {
       method: 'PUT',
       headers: {
@@ -51,9 +49,8 @@ export async function updateFile(
   }
 }
 
-// Cache memory.md in memory for 5 minutes to avoid GitHub rate limits
 let memoryCache: { content: string; cachedAt: number } | null = null
-const MEMORY_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+const MEMORY_CACHE_TTL = 5 * 60 * 1000
 
 export async function getMemoryFile(): Promise<string> {
   if (memoryCache && Date.now() - memoryCache.cachedAt < MEMORY_CACHE_TTL) {
@@ -64,8 +61,7 @@ export async function getMemoryFile(): Promise<string> {
     const { content } = await getFile('memory.md')
     memoryCache = { content, cachedAt: Date.now() }
     return content
-  } catch (error) {
-    console.error('Failed to load memory.md:', error)
-    return '' // graceful degradation — don't crash if GitHub is unreachable
+  } catch {
+    return ''
   }
 }

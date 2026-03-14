@@ -89,3 +89,5 @@ Copy .env.example to .env.local and fill in the required values.
  POST /api/tools/news-headlines 200 in 141ms (compile: 2ms, render: 139ms)
  POST /api/tools/web-search 200 in 1978ms (compile: 288ms, render: 1690ms)
  GET /api/telemetry 200 in 622ms (compile: 7ms, render: 615ms)
+ POST /api/tools/set-reminder 400 in 294ms (compile: 287ms, render: 7ms)
+ POST /api/tools/set-reminder 200 in 878ms (compile: 10ms, render: 868ms)
