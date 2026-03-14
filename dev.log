@@ -1,0 +1,30 @@
+
+> solus@0.1.0 dev:next
+> next dev
+
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.101:3000
+- Environments: .env.local, .env
+
+✓ Starting...
+✓ Ready in 534ms
+Match memories RPC error: {
+  message: 'Invalid API key',
+  hint: 'Double check your Supabase `anon` or `service_role` API key.'
+}
+The data stream is hanging. Did you forget to close it with `data.close()`?
+ POST /api/chat 200 in 2.8min (compile: 278ms, render: 2.8min)
+ PUT /api/inngest 200 in 285ms (compile: 259ms, render: 26ms)
+ HEAD / 200 in 626ms (compile: 467ms, render: 159ms)
+ POST /api/inngest 500 in 9ms (compile: 3ms, render: 7ms)
+Match memories RPC error: {
+  message: 'Invalid API key',
+  hint: 'Double check your Supabase `anon` or `service_role` API key.'
+}
+The data stream is hanging. Did you forget to close it with `data.close()`?
+ POST /api/chat 200 in 2.9min (compile: 188ms, render: 2.9min)
+ GET /api/telemetry 500 in 888ms (compile: 256ms, render: 633ms)
+ POST /api/tools/weather 200 in 1788ms (compile: 133ms, render: 1655ms)
+ POST /api/tools/weather 200 in 46ms (compile: 3ms, render: 43ms)
+ GET /api/telemetry 500 in 158ms (compile: 5ms, render: 153ms)

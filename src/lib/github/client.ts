@@ -50,3 +50,22 @@ export async function updateFile(
     throw new Error(`GitHub updateFile failed: ${response.status} — ${error}`)
   }
 }
+
+// Cache memory.md in memory for 5 minutes to avoid GitHub rate limits
+let memoryCache: { content: string; cachedAt: number } | null = null
+const MEMORY_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+export async function getMemoryFile(): Promise<string> {
+  if (memoryCache && Date.now() - memoryCache.cachedAt < MEMORY_CACHE_TTL) {
+    return memoryCache.content
+  }
+
+  try {
+    const { content } = await getFile('memory.md')
+    memoryCache = { content, cachedAt: Date.now() }
+    return content
+  } catch (error) {
+    console.error('Failed to load memory.md:', error)
+    return '' // graceful degradation — don't crash if GitHub is unreachable
+  }
+}

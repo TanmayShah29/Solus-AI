@@ -2,13 +2,15 @@ import { tool } from "ai";
 import { z } from "zod";
 import { executeTool } from "@/lib/tools/router";
 import { type Memory } from "@/lib/memory/retrieve";
-import { type Task, type Person } from "@/lib/memory/context-assembler";
+import { type Task } from "@/lib/memory/context-assembler";
+import fs from 'fs'
+import path from 'path'
 
 export type ContextBlock = {
     memories: Memory[];
-    knowledgeFacts?: any[]; // To be refined in Section D
+    knowledgeFacts: any[];
     activeTasks: Task[];
-    relevantPeople: Person[];
+    memoryFile: string;
     currentTime: string;
 };
 
@@ -151,24 +153,50 @@ He speaks casually. You respond precisely. The asymmetry is intentional.`;
 export const SOLUS_SYSTEM_PROMPT = PERSONALITY_PROMPT + "\n\n" + SOLUS_SELF_KNOWLEDGE;
 
 export function buildSystemPrompt(context: ContextBlock): string {
-    let prompt = SOLUS_SYSTEM_PROMPT + `
+    return `${SOLUS_SYSTEM_PROMPT}
 
-## Current Context
-`;
+## Long-Term Memory (always read this)
+${context.memoryFile || 'No long-term memory loaded.'}
 
-    if (context.activeTasks && context.activeTasks.length > 0) {
-        prompt += "\n### Active Tasks\n" + context.activeTasks.map(t => `- ${t.title} (Status: ${t.status})`).join("\n");
+## Semantic Memories (retrieved for this query)
+${context.memories.map(m => `- ${m.content} (${timeAgo(m.created_at)})`).join('\n') || 'None.'}
+
+## Knowledge Facts
+${context.knowledgeFacts.map(f => `- ${f.entity}: ${f.value}`).join('\n') || 'None.'}
+
+## Active Tasks
+${context.activeTasks.map(t => `- ${t.title} [${t.status}]`).join('\n') || 'None.'}
+
+## Your Available Skills
+Use these proactively — don't wait to be asked when the intent is clear:
+${loadSkillsSummary()}
+
+## Current Time
+${context.currentTime} IST`;
+}
+
+function loadSkillsSummary(): string {
+    try {
+        const skillsDir = path.join(process.cwd(), 'src/skills')
+        const files = fs.readdirSync(skillsDir).filter(f => f.endsWith('.json'))
+
+        return files.map(file => {
+            const skill = JSON.parse(fs.readFileSync(path.join(skillsDir, file), 'utf-8'))
+            return `- **${skill.name}**: ${skill.description.split('.')[0]}.`
+        }).join('\n')
+    } catch {
+        return 'Skills unavailable.'
     }
+}
 
-    if (context.relevantPeople && context.relevantPeople.length > 0) {
-        prompt += "\n### Relevant People\n" + context.relevantPeople.map(p => `- ${p.name}: ${p.notes}`).join("\n");
-    }
-
-    prompt += `\n\n## Relevant Memories\n` + context.memories.map(m => `- ${m.content}`).join("\n");
-
-    prompt += `\n\nCurrent time: ` + context.currentTime + ` IST`;
-
-    return prompt;
+function timeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const hours = Math.floor(diff / (1000 * 60 * 60))
+    const days = Math.floor(hours / 24)
+    if (hours < 1) return 'just now'
+    if (hours < 24) return `${hours}h ago`
+    if (days < 7) return `${days}d ago`
+    return `${days}d ago`
 }
 
 export function getSolusTools(data?: any) {

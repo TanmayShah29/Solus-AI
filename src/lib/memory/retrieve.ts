@@ -7,53 +7,57 @@ export type Memory = {
     content: string;
     created_at: string;
     confidence: number;
+    score?: number;
 };
 
 export async function retrieveMemories(
     query: string,
-    limit = 5
+    userId: string,
+    limit = 8
 ): Promise<Memory[]> {
-    try {
-        const embedding = await embedText(query);
+    const embedding = await embedText(query);
 
-        const { data, error } = await supabaseAdmin.rpc("match_memories", {
-            query_embedding: embedding,
-            match_user_id: env.MY_USER_ID,
-            match_limit: limit,
-        });
+    // Get more candidates than needed so we can rerank
+    const { data, error } = await supabaseAdmin.rpc("match_memories", {
+        query_embedding: embedding,
+        match_user_id: userId,
+        match_limit: limit * 3,
+    });
 
-        if (error) {
-            console.error("Match memories RPC error:", error);
-            return [];
-        }
-
-        const rawData = data as { content: string; created_at: string; confidence: number }[];
-
-        const scoredMemories = rawData.map(m => {
-            let score = m.confidence;
-            const createdAt = new Date(m.created_at);
-            const now = new Date();
-            const diffMs = now.getTime() - createdAt.getTime();
-            const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-            if (diffDays <= 1) {
-                score += 0.15; // 24h boost
-            } else if (diffDays > 30) {
-                score -= 0.05; // >30d penalty
-            }
-
-            return {
-                ...m,
-                confidence: Math.min(1, Math.max(0, score))
-            };
-        });
-
-        // Re-sort by boosted confidence
-        return scoredMemories.sort((a, b) => b.confidence - a.confidence) as Memory[];
-    } catch (error) {
-        console.error("Failed to retrieve memories:", error);
-        return []; // Return empty array on failure instead of throwing
+    if (error) {
+        console.error("Match memories RPC error:", error);
+        return [];
     }
+
+    if (!data?.length) return [];
+
+    const now = Date.now();
+
+    // Rerank with recency boost
+    const reranked = (data as any[]).map((memory: Memory) => {
+        const ageMs = now - new Date(memory.created_at).getTime();
+        const ageHours = ageMs / (1000 * 60 * 60);
+        const ageDays = ageHours / 24;
+
+        let recencyBoost = 0;
+        if (ageHours < 1) recencyBoost = 0.3;      // last hour
+        else if (ageHours < 24) recencyBoost = 0.2;  // today
+        else if (ageDays < 7) recencyBoost = 0.1;    // this week
+        else if (ageDays > 30) recencyBoost = -0.05; // older than a month
+
+        // Penalize [CONTINUITY] memories slightly — they're supplementary
+        const continuityPenalty = memory.content.startsWith("[CONTINUITY]") ? -0.05 : 0;
+
+        return {
+            ...memory,
+            score: (memory.confidence ?? 0.8) + recencyBoost + continuityPenalty,
+        };
+    });
+
+    // Sort by adjusted score and return top limit
+    return reranked
+        .sort((a, b) => (b.score || 0) - (a.score || 0))
+        .slice(0, limit) as Memory[];
 }
 
 export async function storeMemory(
