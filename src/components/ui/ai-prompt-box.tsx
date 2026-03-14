@@ -516,6 +516,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
     }, [handlePaste]);
 
     const handleSubmit = () => {
+        if (!input.trim() && files.length === 0) return;
         if (input.trim() || files.length > 0) {
             onSend(input, files);
             setInput("");

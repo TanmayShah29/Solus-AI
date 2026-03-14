@@ -16,8 +16,9 @@ export function ChatInterface() {
     });
 
     const handleTranscription = useCallback((text: string) => {
-        if (text.trim()) {
-            append({ role: "user", content: text });
+        const trimmed = text.trim();
+        if (trimmed) {
+            append({ role: "user", content: trimmed });
         }
     }, [append]);
 
