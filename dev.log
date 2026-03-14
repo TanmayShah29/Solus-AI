@@ -124,3 +124,12 @@ Groq Whisper error: {"error":{"message":"file is empty","type":"invalid_request_
  GET /people 200 in 21ms (compile: 2ms, render: 18ms)
  GET /tasks 200 in 20ms (compile: 2ms, render: 18ms)
  GET /tools 200 in 19ms (compile: 3ms, render: 16ms)
+ GET / 200 in 483ms (compile: 231ms, render: 252ms)
+ GET /dashboard 200 in 104ms (compile: 47ms, render: 56ms)
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload when ./src/lib/env.ts changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 153ms
+ GET /dashboard 200 in 1490ms (compile: 169ms, render: 1321ms)
+ PUT /api/inngest 200 in 1975ms (compile: 1745ms, render: 230ms)
+ HEAD /dashboard 200 in 97ms (compile: 16ms, render: 81ms)
