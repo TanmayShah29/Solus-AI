@@ -83,6 +83,10 @@ const envSchema = z.object({
     GOOGLE_REDIRECT_URI: z.string().url(),
     GOOGLE_ACCESS_TOKEN: z.string().optional(),
     GOOGLE_REFRESH_TOKEN: z.string().optional(),
+
+    // GitHub (Long Term Memory)
+    GITHUB_TOKEN: z.string().optional(),
+    GITHUB_REPO: z.string().optional(),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

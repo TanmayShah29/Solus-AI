@@ -63,9 +63,8 @@ export async function storeMemory(
 ): Promise<void> {
     try {
         const embedding = await embedText(content);
-        const supabase = await createClient();
 
-        const { error } = await supabase.from("memories").insert({
+        const { error } = await supabaseAdmin.from("memories").insert({
             user_id: env.MY_USER_ID,
             content,
             embedding,
