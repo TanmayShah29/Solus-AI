@@ -27,12 +27,12 @@ export const POST = traceable(async (req: Request) => {
             }
         )
 
+        const data = await response.json().catch(() => ({}));
+
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            console.error('Telegram API Error:', errorData);
-            throw new Error(`Telegram send failed: ${errorData.description || response.statusText}`);
+            console.error('Telegram API Error:', data);
+            throw new Error(`Telegram send failed: ${data.description || response.statusText}`);
         }
-        const data = await response.json()
 
         return Response.json({
             success: true,
