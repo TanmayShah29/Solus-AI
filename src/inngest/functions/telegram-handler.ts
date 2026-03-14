@@ -61,7 +61,7 @@ async function getTelegramHistory(chatId: number, limit = 10): Promise<CoreMessa
 }
 
 export const telegramHandler = inngest.createFunction(
-    { id: "telegram-handler", concurrency: 1 }, // Limit concurrency per user to avoid race conditions
+    { id: "telegram-handler", concurrency: 1 },
     { event: "telegram/message.received" },
     async ({ event, step }) => {
         const { message, chatId, messageId, telegramUserId } = event.data
@@ -69,12 +69,10 @@ export const telegramHandler = inngest.createFunction(
         const typingInterval = setInterval(() => sendTypingIndicator(chatId), 4000)
 
         try {
-            // Extract content (already simplified in the event data or we do it here)
             let userMessage = message.text || message.caption || ''
             let imageBase64 = null
             const imageMimeType = 'image/jpeg'
 
-            // Handle Photo if present
             if (message.photo) {
                 imageBase64 = await step.run("download-photo", async () => {
                     const photo = message.photo[message.photo.length - 1]
@@ -90,7 +88,6 @@ export const telegramHandler = inngest.createFunction(
                 userMessage = userMessage || 'Explain this image.'
             }
 
-            // Handle Voice if present
             if (message.voice) {
                 userMessage = await step.run("transcribe-voice", async () => {
                     const fileRes = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getFile?file_id=${message.voice.file_id}`)
@@ -120,9 +117,11 @@ export const telegramHandler = inngest.createFunction(
                 })
             }
 
-            if (!userMessage && !imageBase64) return { ok: true }
+            if (!userMessage && !imageBase64) {
+                clearInterval(typingInterval)
+                return { ok: true }
+            }
 
-            // Assemble context
             const context = await step.run("assemble-context", async () => {
                 return assembleContext(env.MY_USER_ID, userMessage || "Explain this image.")
             })
@@ -150,22 +149,7 @@ When Tanmay shares an image:
 
             const messages: CoreMessage[] = [...history, { role: 'user' as const, content: userContent }]
 
-            // Send placeholder
-            const botMessageId = await step.run("send-placeholder", async () => {
-                const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ chat_id: chatId, text: '...', parse_mode: 'Markdown' }),
-                })
-                const data = await res.json()
-                return data.result?.message_id
-            })
-
-            let fullText = ''
-            let lastEditTime = 0
             let toolUsed = false
-            const EDIT_INTERVAL = 2000 // Longer interval for background edits
-
             const result = streamText({
                 model: groq(imageBase64 ? VISION_MODEL : REASONING_MODEL),
                 system: systemPrompt,
@@ -173,23 +157,7 @@ When Tanmay shares an image:
                 tools,
                 maxSteps: 8,
                 onChunk: async ({ chunk }) => {
-                    if (chunk.type === 'text-delta') {
-                        fullText += chunk.textDelta
-                        const now = Date.now()
-                        if (now - lastEditTime > EDIT_INTERVAL && fullText.trim()) {
-                            lastEditTime = now
-                            await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    chat_id: chatId,
-                                    message_id: botMessageId,
-                                    text: fullText + ' ▌',
-                                    parse_mode: 'Markdown',
-                                }),
-                            }).catch(() => { })
-                        }
-                    } else if (chunk.type === 'tool-call' && !toolUsed) {
+                    if (chunk.type === 'tool-call' && !toolUsed) {
                         toolUsed = true
                         await sendReaction(chatId, messageId, '🔍')
                     }
@@ -197,22 +165,12 @@ When Tanmay shares an image:
             })
 
             const { text } = await result
-            fullText = text
             clearInterval(typingInterval)
 
-            // Final edit
-            await step.run("final-edit", async () => {
-                if (botMessageId && fullText.trim()) {
-                    await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            chat_id: chatId,
-                            message_id: botMessageId,
-                            text: fullText,
-                            parse_mode: 'Markdown',
-                        }),
-                    })
+            // Send response
+            await step.run("send-response", async () => {
+                if (text.trim()) {
+                    await sendTelegramMessage(chatId, text)
                     await sendReaction(chatId, messageId, '✅')
                 }
             })
@@ -223,11 +181,11 @@ When Tanmay shares an image:
                 await Promise.all([
                     supabaseAdmin.from('conversations').insert([
                         { user_id: env.MY_USER_ID, session_id: sessionId, channel: 'telegram', role: 'user', content: userMessage || "[Image]" },
-                        { user_id: env.MY_USER_ID, session_id: sessionId, channel: 'telegram', role: 'assistant', content: fullText }
+                        { user_id: env.MY_USER_ID, session_id: sessionId, channel: 'telegram', role: 'assistant', content: text }
                     ]),
                     inngest.send({
                         name: 'solus/turn.completed',
-                        data: { userId: env.MY_USER_ID, userMessage: userMessage || "[Image]", assistantResponse: fullText },
+                        data: { userId: env.MY_USER_ID, userMessage: userMessage || "[Image]", assistantResponse: text },
                     })
                 ])
             })
