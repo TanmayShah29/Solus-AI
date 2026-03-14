@@ -23,6 +23,7 @@ const envSchema = z.object({
 
     // Groq
     GROQ_API_KEY: z.string().min(1, "GROQ_API_KEY is required"),
+    GOOGLE_GEMINI_API_KEY: z.string().optional(),
 
     // Supabase
     NEXT_PUBLIC_SUPABASE_URL: z
