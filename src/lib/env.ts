@@ -94,6 +94,14 @@ const envSchema = z.object({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function validateEnv() {
+    const isServer = typeof window === 'undefined';
+
+    if (!isServer) {
+        // In the browser, Next.js only injects NEXT_PUBLIC_ variables.
+        // We skip full validation to prevent crashes in client components.
+        return process.env as unknown as Env;
+    }
+
     const parsed = envSchema.safeParse(process.env);
 
     if (!parsed.success) {
