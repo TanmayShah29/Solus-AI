@@ -56,11 +56,36 @@ export async function POST(req: Request) {
     }
 
     try {
-        // Extract message content — handle both text and voice
+        // Extract message content — handle text, voice, and photos
         let userMessage: string | null = null
+        let imageBase64: string | null = null
+        const imageMimeType = 'image/jpeg'
 
         if (message.text) {
             userMessage = message.text
+        } else if (message.photo) {
+            await sendTypingIndicator(chatId)
+            // Get the highest resolution photo (last in array)
+            const photo = message.photo[message.photo.length - 1]
+            
+            // Get file path from Telegram
+            const fileRes = await fetch(
+                `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getFile?file_id=${photo.file_id}`
+            )
+            const fileData = await fileRes.json()
+            const filePath = fileData.result?.file_path
+            
+            if (filePath) {
+                // Download the file
+                const imageRes = await fetch(
+                    `https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${filePath}`
+                )
+                const imageBuffer = await imageRes.arrayBuffer()
+                imageBase64 = Buffer.from(imageBuffer).toString('base64')
+                
+                // Use caption as text if provided
+                userMessage = message.caption || 'Explain this image.'
+            }
         } else if (message.voice) {
             await sendTypingIndicator(chatId)
 
@@ -108,7 +133,7 @@ export async function POST(req: Request) {
             userMessage = transcribeData.text
         }
 
-        if (!userMessage) return Response.json({ ok: true })
+        if (!userMessage && !imageBase64) return Response.json({ ok: true })
 
         // Send typing indicator
         await sendTypingIndicator(chatId)
@@ -116,7 +141,7 @@ export async function POST(req: Request) {
         const userId = env.MY_USER_ID
 
         // Retrieve relevant context (memories, tasks, people)
-        const { memories, activeTasks, relevantPeople } = await getContextBlock(userMessage)
+        const { memories, activeTasks, relevantPeople } = await getContextBlock(userMessage || "Explain this image.")
 
         const context: ContextBlock = {
             memories,
@@ -125,16 +150,36 @@ export async function POST(req: Request) {
             currentTime: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
         };
 
-        const systemPrompt = buildSystemPrompt(context);
+        const systemPrompt = buildSystemPrompt(context) + `
+
+## Vision
+
+When Tanmay shares an image:
+- Describe what you see concisely and relevantly
+- If it's code: identify the language, spot issues, suggest improvements
+- If it's a screenshot: describe what's happening on screen
+- If it's a document: extract the key information
+- If it's a photo: describe it naturally
+- Never say "I can see an image" — just respond to what's in it`;
 
         // Define tools — same as web UI
         const tools = loadSkills(null);
 
+        const hasImage = !!imageBase64
+        const VISION_MODEL = 'llama-3.2-90b-vision-preview'
+
+        const userContent = imageBase64
+            ? [
+                { type: 'image' as const, image: imageBase64, mimeType: imageMimeType },
+                { type: 'text' as const, text: userMessage || 'Explain this image.' },
+            ]
+            : (userMessage!);
+
         // Generate response
         const { text } = await generateText({
-            model: groq(REASONING_MODEL),
+            model: groq(hasImage ? VISION_MODEL : REASONING_MODEL),
             system: systemPrompt,
-            messages: [{ role: 'user', content: userMessage }],
+            messages: [{ role: 'user' as const, content: userContent }],
             tools,
             maxSteps: 8,
         })
