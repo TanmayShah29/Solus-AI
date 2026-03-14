@@ -3,7 +3,7 @@
 > This file is maintained autonomously by Solus.
 > After every significant conversation, Solus extracts key facts and updates this file via GitHub.
 > Format: entity → attribute → value. Add new facts. Never delete old ones unless explicitly corrected.
-> Last updated: 2026-03-14
+> Last updated: 14/3/2026, 12:39:03 pm IST
 
 ---
 
@@ -17,6 +17,10 @@
 - Timezone: IST (UTC+5:30)
 - Preferred coding tools: Gemini CLI, Antigravity
 - GitHub: TanmayShah29
+
+<!-- Added 14/3/2026, 12:39:03 pm IST -->
+- Favourite food is dal baati churma
+- Hates mornings
 
 ## Projects
 
