@@ -147,7 +147,7 @@ When Tanmay shares an image:
                 ]
                 : userMessage;
 
-            const messages: CoreMessage[] = [...history, { role: 'user' as const, content: userContent }]
+            const messages: CoreMessage[] = [...history, { role: 'user' as const, content: userContent as any }]
 
             let toolUsed = false
             const result = streamText({
