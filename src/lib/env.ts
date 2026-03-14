@@ -12,7 +12,6 @@
  *   const key = env.GROQ_API_KEY;
  */
 
-import "dotenv/config";
 import { z } from "zod";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,52 +90,51 @@ const envSchema = z.object({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Type export
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type Env = z.infer<typeof envSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Validation
 // ─────────────────────────────────────────────────────────────────────────────
 
-function validateEnv() {
+function validateEnv(): Env {
     const isServer = typeof window === 'undefined';
 
     if (!isServer) {
         // In the browser, Next.js performs static replacement of process.env.NEXT_PUBLIC_...
-        // We manually map them here to ensure they are available in the returned object.
+        // We MUST use the full process.env.NEXT_PUBLIC_NAME string for replacement to work.
         return {
-            NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-            NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-            NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-            NEXT_PUBLIC_API_SECRET_TOKEN: process.env.NEXT_PUBLIC_API_SECRET_TOKEN,
-        } as unknown as Env;
+            NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL!,
+            NEXT_PUBLIC_API_SECRET_TOKEN: process.env.NEXT_PUBLIC_API_SECRET_TOKEN!,
+        } as Env;
     }
 
     const parsed = envSchema.safeParse(process.env);
 
     if (!parsed.success) {
-        // Produce a clean, readable list — not a raw Zod dump.
         const missing = parsed.error.issues.map(
             (issue) => `  • ${String(issue.path[0] ?? "(unknown)")}: ${issue.message}`
         );
 
-        throw new Error(
-            [
-                "",
-                "❌  SOLUS startup failed — missing or invalid environment variables:",
-                ...missing,
-                "",
-                "Copy .env.example to .env.local and fill in the required values.",
-                "",
-            ].join("\n")
-        );
+        const errorMsg = [
+            "",
+            "❌  SOLUS startup failed — missing or invalid environment variables:",
+            ...missing,
+            "",
+            "Copy .env.example to .env.local and fill in the required values.",
+            "",
+        ].join("\n");
+
+        console.error(errorMsg);
+        throw new Error(errorMsg);
     }
 
     return parsed.data;
 }
 
-// Validate once at module load time (server-side only).
-// Next.js client bundles never import this file — only NEXT_PUBLIC_* vars.
 export const env = validateEnv();
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Type export
-// ─────────────────────────────────────────────────────────────────────────────
-
-export type Env = z.infer<typeof envSchema>;
