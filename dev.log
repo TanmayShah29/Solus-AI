@@ -91,3 +91,15 @@ Copy .env.example to .env.local and fill in the required values.
  GET /api/telemetry 200 in 622ms (compile: 7ms, render: 615ms)
  POST /api/tools/set-reminder 400 in 294ms (compile: 287ms, render: 7ms)
  POST /api/tools/set-reminder 200 in 878ms (compile: 10ms, render: 868ms)
+Groq Whisper error: {"error":{"message":"file is empty","type":"invalid_request_error"}}
+
+ POST /api/transcribe 500 in 1140ms (compile: 870ms, render: 270ms)
+ POST /api/inngest 500 in 400ms (compile: 390ms, render: 9ms)
+✓ Compiled in 543ms
+  Reload env: .env.local
+  Reload env: .env
+ GET /api/inngest 200 in 724ms (compile: 698ms, render: 26ms)
+ PUT /api/inngest 200 in 844ms (compile: 766ms, render: 79ms)
+ HEAD / 200 in 802ms (compile: 591ms, render: 211ms)
+ GET /dashboard 200 in 1534ms (compile: 1467ms, render: 67ms)
+ GET /dashboard 200 in 96ms (compile: 26ms, render: 70ms)
