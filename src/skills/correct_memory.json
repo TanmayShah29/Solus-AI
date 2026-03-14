@@ -1,0 +1,12 @@
+{
+  "name": "correct_memory",
+  "description": "Correct an existing fact in long-term memory. Use ONLY when Tanmay explicitly corrects something — says something contradicts what you previously knew, or says 'actually' or 'I changed' or 'that's wrong'. Do not use for new information — use update_memory for that.",
+  "category": "memory",
+  "auto_approve": true,
+  "worker_url": "/api/tools/correct-memory",
+  "parameters": {
+    "old_fact": { "type": "string", "required": true, "description": "The incorrect fact as it currently exists in memory" },
+    "new_fact": { "type": "string", "required": true, "description": "The corrected replacement fact" }
+  },
+  "thinking_message": "Correcting memory..."
+}

@@ -1,0 +1,19 @@
+{
+  "name": "google_calendar",
+  "description": "Read, create, and check Tanmay's Google Calendar. Actions: list_events, create_event, check_free_busy.",
+  "category": "productivity",
+  "auto_approve": true,
+  "worker_url": "/api/tools/google-calendar",
+  "parameters": {
+    "action": { "type": "string", "required": true, "description": "Action to perform", "enum": ["list_events", "create_event", "check_free_busy"] },
+    "time_min": { "type": "string", "required": false, "description": "ISO 8601 datetime" },
+    "time_max": { "type": "string", "required": false, "description": "ISO 8601 datetime" },
+    "max_results": { "type": "number", "required": false },
+    "title": { "type": "string", "required": false },
+    "start_time": { "type": "string", "required": false, "description": "ISO 8601 datetime in IST" },
+    "end_time": { "type": "string", "required": false, "description": "ISO 8601 datetime in IST" },
+    "description": { "type": "string", "required": false },
+    "location": { "type": "string", "required": false }
+  },
+  "thinking_message": "Checking Google Calendar..."
+}

@@ -42,6 +42,15 @@ You have 8 tools available. Use them autonomously — do not ask permission befo
 7. **telegram_send** — Send a message to Tanmay on Telegram. Use for notifications and follow-ups.
 8. **set_reminder** — Inngest-powered durable reminder. Survives server restarts. Delivers via Telegram at the specified time.
 
+## Tool Error Recovery
+
+If a tool returns { "success": false, "retry_suggestion": "..." }:
+1. Read the retry_suggestion carefully
+2. Identify what was wrong with your arguments
+3. Call the tool again with corrected arguments
+4. Only tell Tanmay about the failure if you have exhausted all retries
+5. Never say "I tried X times" — just deliver the result or give a single clean failure message
+
 ## Your Memory System
 
 You have three tiers of memory:
@@ -314,6 +323,18 @@ export function getSolusTools(data?: any) {
             execute: async (args) => {
                 if (data) data.append({ type: 'thinking', step: 'Saving to long-term memory...' })
                 return executeTool('update-memory', args)
+            }
+        }),
+
+        correct_memory: tool({
+            description: "Correct an existing fact in long-term memory. Use ONLY when Tanmay explicitly corrects something — says something contradicts what you previously knew, or says 'actually' or 'I changed' or 'that's wrong'. Do not use for new information — use update_memory for that.",
+            parameters: z.object({
+                old_fact: z.string().describe('The incorrect fact as it currently exists in memory'),
+                new_fact: z.string().describe('The corrected replacement fact'),
+            }),
+            execute: async (args) => {
+                if (data) data.append({ type: 'thinking', step: 'Correcting memory...' })
+                return executeTool('correct-memory', args)
             }
         }),
     };

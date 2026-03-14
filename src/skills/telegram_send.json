@@ -1,0 +1,11 @@
+{
+  "name": "telegram_send",
+  "description": "Send a message to Tanmay on Telegram.",
+  "category": "communication",
+  "auto_approve": false,
+  "worker_url": "/api/tools/telegram-send",
+  "parameters": {
+    "message": { "type": "string", "required": true, "description": "The message to send" }
+  },
+  "thinking_message": "Sending Telegram message..."
+}

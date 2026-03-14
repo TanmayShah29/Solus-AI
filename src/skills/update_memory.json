@@ -1,0 +1,12 @@
+{
+  "name": "update_memory",
+  "description": "Permanently save important facts about Tanmay to long-term memory. Use this proactively when Tanmay shares something worth remembering — a preference, a decision, a goal, a fact about his life, a project update. Do not use for trivial or temporary things. Examples of when to use: he mentions his favourite food, he tells you about a new project, he shares a deadline, he corrects something you knew wrongly.",
+  "category": "memory",
+  "auto_approve": true,
+  "worker_url": "/api/tools/update-memory",
+  "parameters": {
+    "facts": { "type": "array", "required": true, "description": "Array of facts to remember. Each fact should be a single clear sentence.", "items": { "type": "string" } },
+    "section": { "type": "string", "required": true, "description": "Section in memory.md to add facts under. Use existing sections: \"About Tanmay\", \"Projects\", \"Preferences & Patterns\", \"Technical Decisions Made\", \"Conversation History Notes\". Create a new section name if none fit." }
+  },
+  "thinking_message": "Saving to long-term memory..."
+}

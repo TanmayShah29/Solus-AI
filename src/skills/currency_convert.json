@@ -1,0 +1,13 @@
+{
+  "name": "currency_convert",
+  "description": "Convert between currencies using live rates.",
+  "category": "personal",
+  "auto_approve": true,
+  "worker_url": "/api/tools/currency-convert",
+  "parameters": {
+    "from": { "type": "string", "required": true, "description": "Source currency code e.g. USD, INR, EUR" },
+    "to": { "type": "string", "required": true, "description": "Target currency code e.g. USD, INR, EUR" },
+    "amount": { "type": "number", "required": true, "description": "Amount to convert" }
+  },
+  "thinking_message": "Converting {amount} {from} to {to}..."
+}

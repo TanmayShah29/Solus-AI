@@ -5,7 +5,8 @@ import { generateText } from 'ai'
 import { retrieveMemories } from '@/lib/memory/retrieve'
 import { getContextBlock } from '@/lib/memory/context-assembler'
 import { inngest } from '@/inngest/client'
-import { getSolusTools, buildSystemPrompt, type ContextBlock } from '@/lib/kernel'
+import { buildSystemPrompt, type ContextBlock } from '@/lib/kernel'
+import { loadSkills } from '@/lib/skills/loader'
 
 // Verify request is from Telegram
 function verifyTelegram(req: Request): boolean {
@@ -127,7 +128,7 @@ export async function POST(req: Request) {
         const systemPrompt = buildSystemPrompt(context);
 
         // Define tools — same as web UI
-        const tools = getSolusTools();
+        const tools = loadSkills(null);
 
         // Generate response
         const { text } = await generateText({
@@ -135,7 +136,7 @@ export async function POST(req: Request) {
             system: systemPrompt,
             messages: [{ role: 'user', content: userMessage }],
             tools,
-            maxSteps: 5,
+            maxSteps: 8,
         })
 
         // Send response

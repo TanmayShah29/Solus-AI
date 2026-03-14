@@ -1,0 +1,12 @@
+{
+  "name": "news_headlines",
+  "description": "Get latest news headlines on any topic.",
+  "category": "research",
+  "auto_approve": true,
+  "worker_url": "/api/tools/news-headlines",
+  "parameters": {
+    "topic": { "type": "string", "required": true, "description": "News topic e.g. AI, cricket, India, technology" },
+    "max_results": { "type": "number", "required": false, "description": "Number of articles, default 5" }
+  },
+  "thinking_message": "Finding latest news about \"{topic}\"..."
+}

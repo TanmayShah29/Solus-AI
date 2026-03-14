@@ -1,0 +1,12 @@
+{
+  "name": "set_reminder",
+  "description": "Set a reminder that will be delivered to Tanmay on Telegram after a specified time.",
+  "category": "personal",
+  "auto_approve": true,
+  "worker_url": "/api/tools/set-reminder",
+  "parameters": {
+    "message": { "type": "string", "required": true, "description": "The reminder message to send" },
+    "duration": { "type": "string", "required": true, "description": "How long to wait e.g. \"15 mins\", \"2 hours\", \"1 day\"" }
+  },
+  "thinking_message": "Setting reminder for {duration}..."
+}
