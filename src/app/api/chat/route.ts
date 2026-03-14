@@ -12,6 +12,7 @@ import { getErrorMessage } from "@/lib/errors/messages";
 
 // Allow up to 30 s on Vercel (streaming responses need more than the 10 s default).
 export const maxDuration = 30;
+export const runtime = 'nodejs';
 
 async function isFirstConversation(userId: string): Promise<boolean> {
     const { count } = await supabaseAdmin
