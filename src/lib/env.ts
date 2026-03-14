@@ -38,12 +38,12 @@ const envSchema = z.object({
         .min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
 
     // LangSmith
-    LANGSMITH_API_KEY: z.string().min(1, "LANGSMITH_API_KEY is required"),
+    LANGSMITH_API_KEY: z.string().optional(),
 
     // SOLUS identity
-    MY_USER_ID: z.string().min(1, "MY_USER_ID is required"),
-    MY_TELEGRAM_ID: z.string().min(1, "MY_TELEGRAM_ID is required"),
-    MY_TIMEZONE: z.string().min(1, "MY_TIMEZONE is required"),
+    MY_USER_ID: z.string().default('tanmay'),
+    MY_TELEGRAM_ID: z.string().default('1870486124'),
+    MY_TIMEZONE: z.string().default('Asia/Kolkata'),
 
     // Security
     API_SECRET_TOKEN: z.string().min(1, "API_SECRET_TOKEN is required"),

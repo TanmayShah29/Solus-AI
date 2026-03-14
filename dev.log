@@ -103,3 +103,11 @@ Groq Whisper error: {"error":{"message":"file is empty","type":"invalid_request_
  HEAD / 200 in 802ms (compile: 591ms, render: 211ms)
  GET /dashboard 200 in 1534ms (compile: 1467ms, render: 67ms)
  GET /dashboard 200 in 96ms (compile: 26ms, render: 70ms)
+ GET / 200 in 204ms (compile: 57ms, render: 147ms)
+ GET /dashboard 200 in 2.4s (compile: 1376ms, render: 976ms)
+ GET / 200 in 82ms (compile: 20ms, render: 61ms)
+○ Compiling /memory ...
+ GET /memory 200 in 6.5s (compile: 6.2s, render: 261ms)
+ GET /memory 200 in 154ms (compile: 14ms, render: 141ms)
+ PUT /api/inngest 200 in 562ms (compile: 512ms, render: 50ms)
+ HEAD /dashboard 200 in 518ms (compile: 233ms, render: 284ms)
