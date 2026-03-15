@@ -1,18 +1,32 @@
 import { inngest } from '@/inngest/client'
-import { createClient } from '@/lib/supabase/server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import { generateText } from 'ai'
 import { groq, REASONING_MODEL } from '@/lib/groq/client'
 
 export const taskRunner = inngest.createFunction(
-    { id: "task-runner" },
+    { 
+        id: "task-runner",
+        onFailure: async ({ event, error }) => {
+            const originalEvent = event.data.event;
+            const taskId = originalEvent.data.taskId;
+            if (taskId) {
+                await supabaseAdmin
+                    .from('tasks')
+                    .update({ 
+                        status: 'failed',
+                        result: { error: error.message }
+                    })
+                    .eq('id', taskId);
+            }
+        }
+    },
     { event: "solus/task.created" },
     async ({ event, step }) => {
         const { taskId, goal } = event.data;
 
         // Step 1 — "load-task": Fetch the task from Supabase by event.data.taskId. Update its status to "running".
         await step.run("load-task", async () => {
-            const supabase = await createClient();
-            const { error } = await supabase
+            const { error } = await supabaseAdmin
                 .from('tasks')
                 .update({ status: 'running' })
                 .eq('id', taskId);
@@ -32,12 +46,16 @@ Set requires_approval to true for any step that: sends messages, modifies files,
 Goal: ${goal}`
             });
 
-            // Parse text as JSON array
-            const jsonMatch = text.match(/\[[\s\S]*\]/);
-            const steps = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+            // Parse text as JSON array safely
+            let steps = [];
+            try {
+                const jsonMatch = text.match(/\[[\s\S]*\]/);
+                steps = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+            } catch (e) {
+                throw new Error("Failed to parse LLM step planning output as JSON");
+            }
 
-            const supabase = await createClient();
-            const { error } = await supabase
+            const { error } = await supabaseAdmin
                 .from('tasks')
                 .update({ steps })
                 .eq('id', taskId);
@@ -52,8 +70,7 @@ Goal: ${goal}`
             if (s.requires_approval) {
                 // update task status to "paused"
                 await step.run("pause-for-approval", async () => {
-                    const supabase = await createClient();
-                    await supabase
+                    await supabaseAdmin
                         .from('tasks')
                         .update({ status: 'paused' })
                         .eq('id', taskId);
@@ -67,8 +84,7 @@ Goal: ${goal}`
 
                 if (!approval || !approval.data.approved) {
                     await step.run("mark-failed", async () => {
-                        const supabase = await createClient();
-                        await supabase
+                        await supabaseAdmin
                             .from('tasks')
                             .update({
                                 status: 'failed',
@@ -82,8 +98,7 @@ Goal: ${goal}`
 
             // If approved or no approval needed: update current_step in Supabase, update status back to "running"
             await step.run("update-current-step", async () => {
-                const supabase = await createClient();
-                await supabase
+                await supabaseAdmin
                     .from('tasks')
                     .update({
                         current_step: s.step,
@@ -97,8 +112,7 @@ Goal: ${goal}`
 
         // Step 4 — "complete-task": Update task status to "completed", set completed_at to now, store a summary result.
         await step.run("complete-task", async () => {
-            const supabase = await createClient();
-            await supabase
+            await supabaseAdmin
                 .from('tasks')
                 .update({
                     status: 'completed',

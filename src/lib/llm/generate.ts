@@ -45,7 +45,7 @@ export async function generateWithFallback(options: GenerateOptions): Promise<st
       lastError = error
       console.error(`[LLM] ${provider} failed:`, error)
 
-      const { isProviderError: isProvErr, reason } = isProviderError(error)
+      const { isProviderError: isProvErr, reason } = isProviderError(error, provider)
       if (isProvErr) {
         await markProviderDown(provider, reason)
         console.log(`[LLM] Marked ${provider} as down, trying next provider`)
@@ -102,7 +102,7 @@ export async function streamWithFallback(
       lastError = error
       console.error(`[LLM] Stream ${provider} failed:`, error)
 
-      const { isProviderError: isProvErr, reason } = isProviderError(error)
+      const { isProviderError: isProvErr, reason } = isProviderError(error, provider)
       if (isProvErr) {
         await markProviderDown(provider, reason)
         continue

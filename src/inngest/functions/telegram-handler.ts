@@ -114,9 +114,6 @@ export const telegramHandler = inngest.createFunction(
     // Start typing indicator
     await sendTyping(chatId)
 
-    // Keep typing alive during processing
-    const typingInterval = setInterval(() => sendTyping(chatId), 4000)
-
     try {
       // Handle content extraction
       let messageText = message.text ?? message.caption ?? ''
@@ -171,7 +168,6 @@ export const telegramHandler = inngest.createFunction(
       }
 
       if (!messageText && !imageBase64) {
-        clearInterval(typingInterval)
         return { skipped: 'no content' }
       }
 
@@ -261,11 +257,9 @@ export const telegramHandler = inngest.createFunction(
         },
       })
 
-      clearInterval(typingInterval)
       return { success: true, messageLength: fullText.length }
 
     } catch (error) {
-      clearInterval(typingInterval)
       console.error('Telegram handler error:', error)
       await sendReaction(chatId, messageId, '⚡')
       await sendMessage(chatId, getErrorMessage(error))

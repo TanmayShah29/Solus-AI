@@ -86,24 +86,31 @@ export function getProviderModel(provider: Provider, modelType: ModelType) {
   throw new Error(`Provider ${provider} not available`)
 }
 
-export function isProviderError(error: unknown): { isProviderError: boolean; provider: Provider | null; reason: string } {
+export function isProviderError(error: unknown, attemptedProvider?: Provider): { isProviderError: boolean; provider: Provider | null; reason: string } {
   const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
 
-  if (
+  const isDownError = 
     message.includes('rate_limit') ||
     message.includes('429') ||
     message.includes('quota') ||
-    message.includes('token') ||
     message.includes('capacity') ||
     message.includes('overloaded') ||
-    message.includes('groq')
-  ) {
-    return { isProviderError: true, provider: 'groq', reason: message }
+    message.includes('502') ||
+    message.includes('503') ||
+    message.includes('504');
+
+  if (!isDownError) {
+    return { isProviderError: false, provider: null, reason: message }
   }
 
-  if (message.includes('gemini') || message.includes('google')) {
-    return { isProviderError: true, provider: 'gemini', reason: message }
+  let provider: Provider | null = attemptedProvider || null;
+  if (!provider) {
+    if (message.includes('gemini') || message.includes('google')) {
+      provider = 'gemini'
+    } else if (message.includes('groq')) {
+      provider = 'groq'
+    }
   }
 
-  return { isProviderError: false, provider: null, reason: message }
+  return { isProviderError: true, provider, reason: message }
 }
