@@ -1,5 +1,5 @@
 import { generateText, streamText, CoreMessage, StreamData } from 'ai'
-import { getProviderModel, markProviderDown, markProviderUp, isProviderDown, isProviderError, type ModelType } from './providers'
+import { getProviderModel, markProviderDown, markProviderUp, isProviderDown, isProviderError, type ModelType, google } from './providers'
 
 interface GenerateOptions {
   modelType: ModelType
@@ -14,6 +14,9 @@ const PROVIDER_ORDER = ['groq', 'gemini'] as const
 
 export async function generateWithFallback(options: GenerateOptions): Promise<string> {
   const { modelType, system, messages, tools, maxSteps = 5 } = options
+
+  console.log(`[LLM] generateWithFallback started. Provider order: ${PROVIDER_ORDER}`)
+  console.log(`[LLM] Gemini configured: ${!!google}`)
 
   let lastError: unknown = null
 
@@ -65,6 +68,9 @@ export async function streamWithFallback(
   options: GenerateOptions & { data: StreamData; onChunk?: (text: string) => void }
 ): Promise<string> {
   const { modelType, system, messages, tools, maxSteps = 5, data, onChunk } = options
+
+  console.log(`[LLM] streamWithFallback started. Provider order: ${PROVIDER_ORDER}`)
+  console.log(`[LLM] Gemini configured: ${!!google}`)
 
   let lastError: unknown = null
 

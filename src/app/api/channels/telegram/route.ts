@@ -1,5 +1,6 @@
 import { env } from '@/lib/env'
 import { inngest } from '@/inngest/client'
+import { redis } from '@/lib/redis/client'
 
 export async function POST(req: Request) {
   try {
@@ -15,19 +16,32 @@ export async function POST(req: Request) {
     // Ignore non-message updates
     if (!message) return Response.json({ ok: true })
 
-    // 2. Whitelist check
+    // 2. Deduplication — ignore messages we've already processed
+    const messageId = message.message_id
+    if (messageId) {
+      const dedupeKey = `telegram:processed:${messageId}`
+      const alreadyProcessed = await redis.get(dedupeKey)
+      if (alreadyProcessed) {
+        console.log(`[Telegram] Duplicate message ${messageId} — skipping`)
+        return Response.json({ ok: true })
+      }
+      // Mark as processed for 24 hours
+      await redis.set(dedupeKey, '1', { ex: 86400 })
+    }
+
+    // 3. Whitelist check
     if (message.from?.id.toString() !== env.MY_TELEGRAM_ID) {
       return Response.json({ ok: true })
     }
 
-    // 3. Fire and forget — send to Inngest for async processing
+    // 4. Fire and forget — send to Inngest for async processing
     // This acknowledges the request to Telegram within milliseconds, preventing retries.
     await inngest.send({
       name: 'solus/telegram.message',
       data: { message },
     })
 
-    // 4. Respond to Telegram immediately — within milliseconds
+    // 5. Respond to Telegram immediately — within milliseconds
     return Response.json({ ok: true })
 
   } catch (error) {
