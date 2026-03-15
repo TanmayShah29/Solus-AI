@@ -5,7 +5,7 @@ export async function POST(req: Request) {
   try {
     // 1. Security check — must happen before anything else
     const secret = req.headers.get('x-telegram-bot-api-secret-token')
-    if (secret !== env.TELEGRAM_WEBHOOK_SECRET) {
+    if (secret !== env.TELEGRAM_SECRET_TOKEN) {
       return new Response('Unauthorized', { status: 401 })
     }
 

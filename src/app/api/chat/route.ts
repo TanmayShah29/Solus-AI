@@ -133,10 +133,13 @@ When Tanmay shares an image:
 
         // Selection with fallback
         let model;
+        let attemptedProvider: 'groq' | 'gemini' = 'groq';
         try {
-            model = getProviderModel(groqDown ? 'gemini' : 'groq', modelType);
+            attemptedProvider = groqDown ? 'gemini' : 'groq';
+            model = getProviderModel(attemptedProvider, modelType);
         } catch (e) {
             // If fallback failed but Groq is up, try Groq
+            attemptedProvider = 'groq';
             model = getProviderModel('groq', modelType);
         }
 
@@ -148,8 +151,10 @@ When Tanmay shares an image:
                 tools,
                 maxSteps: 5,
                 onFinish: async ({ text, usage }) => {
-                    if (!groqDown) {
+                    if (attemptedProvider === 'groq') {
                         await markProviderUp('groq');
+                    } else {
+                        await markProviderUp('gemini');
                     }
 
                     try {
@@ -210,7 +215,7 @@ When Tanmay shares an image:
                 },
             });
         } catch (error) {
-            const { isProviderError: isProvErr, provider, reason } = isProviderError(error);
+            const { isProviderError: isProvErr, provider, reason } = isProviderError(error, attemptedProvider);
             if (isProvErr && provider) {
                 await markProviderDown(provider, reason);
                 // Retry with Gemini if Groq failed
