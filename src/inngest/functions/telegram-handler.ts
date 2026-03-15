@@ -16,14 +16,6 @@ const isSimpleMessage = (text: string) => {
   return words < 20 && !hasComplexity
 }
 
-async function sendTyping(chatId: number) {
-  await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendChatAction`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, action: 'typing' }),
-  }).catch(() => {})
-}
-
 async function sendMessage(chatId: number, text: string): Promise<number | null> {
   const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
@@ -110,9 +102,6 @@ export const telegramHandler = inngest.createFunction(
       await sendMessage(chatId, "Daily token budget exhausted. We must wait for the next cycle, sir.")
       return { error: 'Budget exhausted' }
     }
-
-    // Start typing indicator
-    await sendTyping(chatId)
 
     try {
       // Handle content extraction
