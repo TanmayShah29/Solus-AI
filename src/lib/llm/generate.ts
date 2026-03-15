@@ -15,8 +15,14 @@ const PROVIDER_ORDER = ['groq', 'gemini'] as const
 export async function generateWithFallback(options: GenerateOptions): Promise<string> {
   const { modelType, system, messages, tools, maxSteps = 5 } = options
 
-  console.log(`[LLM] generateWithFallback started. Provider order: ${PROVIDER_ORDER}`)
-  console.log(`[LLM] Gemini configured: ${!!google}`)
+  console.log('[LLM] generateWithFallback called')
+  console.log('[LLM] google client available:', !!google)
+  console.log('[LLM] PROVIDER_ORDER:', PROVIDER_ORDER)
+
+  for (const provider of PROVIDER_ORDER) {
+    const down = await isProviderDown(provider)
+    console.log(`[LLM] ${provider} down:`, down)
+  }
 
   let lastError: unknown = null
 
@@ -69,8 +75,14 @@ export async function streamWithFallback(
 ): Promise<string> {
   const { modelType, system, messages, tools, maxSteps = 5, data, onChunk } = options
 
-  console.log(`[LLM] streamWithFallback started. Provider order: ${PROVIDER_ORDER}`)
-  console.log(`[LLM] Gemini configured: ${!!google}`)
+  console.log('[LLM] streamWithFallback called')
+  console.log('[LLM] google client available:', !!google)
+  console.log('[LLM] PROVIDER_ORDER:', PROVIDER_ORDER)
+
+  for (const provider of PROVIDER_ORDER) {
+    const down = await isProviderDown(provider)
+    console.log(`[LLM] ${provider} down:`, down)
+  }
 
   let lastError: unknown = null
 
