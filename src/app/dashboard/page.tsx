@@ -14,17 +14,25 @@ interface Stats {
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
+  const [llmStatus, setLlmStatus] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function loadStats() {
-      const res = await fetch('/api/dashboard/stats', {
-        headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` }
-      })
-      if (res.ok) {
-        const data = await res.json()
+      const [statsRes, statusRes] = await Promise.all([
+        fetch('/api/dashboard/stats', {
+          headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` }
+        }),
+        fetch('/api/llm-status', {
+          headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` }
+        }).then(r => r.json()).catch(() => null)
+      ])
+
+      if (statsRes.ok) {
+        const data = await statsRes.json()
         setStats(data)
       }
+      setLlmStatus(statusRes)
       setLoading(false)
     }
 
@@ -40,6 +48,18 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-black p-8">
       <h1 className="text-2xl font-light text-white/80 mb-8">Dashboard</h1>
+
+      {llmStatus && (
+        <div className="flex gap-4 mb-8">
+          {Object.entries(llmStatus.providers as Record<string, boolean>).map(([provider, up]) => (
+            <div key={provider} className="flex items-center gap-2 text-sm bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+              <span className={`w-2 h-2 rounded-full ${up ? 'bg-green-400' : 'bg-red-400'}`} />
+              <span className="text-white/50 capitalize">{provider}</span>
+              <span className={up ? 'text-green-400' : 'text-red-400'}>{up ? 'up' : 'down'}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">

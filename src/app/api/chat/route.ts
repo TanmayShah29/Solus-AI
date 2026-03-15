@@ -1,5 +1,12 @@
 import { streamText, StreamData } from "ai";
-import { groq, google, REASONING_MODEL, FAST_MODEL, GEMINI_MODEL, isGroqLimited, markGroqLimited } from "@/lib/groq/client";
+import { 
+    getProviderModel, 
+    markProviderDown, 
+    markProviderUp, 
+    isProviderDown, 
+    isProviderError,
+    type ModelType
+} from "@/lib/llm/providers";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { env } from "@/lib/env";
 import { toolRatelimit, dailyBudget } from "@/lib/redis/client";
@@ -32,25 +39,23 @@ export async function POST(req: Request) {
     const data = new StreamData();
     try {
         // 0. Check if Groq is already known to be limited
-        const groqLimited = await isGroqLimited();
+        const groqDown = await isProviderDown('groq');
 
-        if (groqLimited && !google) {
+        if (groqDown && !env.GOOGLE_GEMINI_API_KEY) {
             return new Response(
                 JSON.stringify({
                     error: "Daily token limit hit. Resets at midnight IST.",
                 }),
                 { status: 429, headers: { "Content-Type": "application/json" } }
             );
-        } else if (groqLimited && google) {
+        } else if (groqDown && env.GOOGLE_GEMINI_API_KEY) {
             data.append({ type: 'thinking', step: 'Switching to backup model...' });
         }
 
         // 1. Token budget check
         const budgetIdentifier = `tokens:tanmay`;
         const budget = await dailyBudget.limit(budgetIdentifier);
-        if (!budget.success && !groqLimited) {
-            // Only enforce dailyBudget if we haven't already marked Groq as limited
-            // If it is limited, we're on Gemini which might have different rules
+        if (!budget.success && !groqDown) {
             return new Response(
                 JSON.stringify({
                     error: "Daily token budget exhausted. We must wait for the next cycle, sir.",
@@ -122,90 +127,116 @@ When Tanmay shares an image:
             Array.isArray(m.content) && m.content.some((c: any) => c.type === 'image')
         ) || messages.some((m: any) => m.experimental_attachments?.some((a: any) => a.contentType.startsWith('image/')));
 
-        const VISION_MODEL = 'llama-3.2-90b-vision-preview';
-
-        const modelSelection = hasImages 
-            ? VISION_MODEL 
-            : (isSimpleMessage(latestMessage) ? FAST_MODEL : REASONING_MODEL);
+        const modelType: ModelType = hasImages 
+            ? 'vision' 
+            : (isSimpleMessage(latestMessage) ? 'fast' : 'reasoning');
 
         // Selection with fallback
-        const model = (groqLimited && google)
-            ? google(GEMINI_MODEL)
-            : groq(modelSelection);
+        let model;
+        try {
+            model = getProviderModel(groqDown ? 'gemini' : 'groq', modelType);
+        } catch (e) {
+            // If fallback failed but Groq is up, try Groq
+            model = getProviderModel('groq', modelType);
+        }
 
-        const result = streamText({
-            model: model as any,
-            system: systemPrompt,
-            messages,
-            tools,
-            maxSteps: 5,
-            onFinish: async ({ text, usage }) => {
+        try {
+            const result = streamText({
+                model: model as any,
+                system: systemPrompt,
+                messages,
+                tools,
+                maxSteps: 5,
+                onFinish: async ({ text, usage }) => {
+                    if (!groqDown) {
+                        await markProviderUp('groq');
+                    }
 
-                try {
-                    const session_id = crypto.randomUUID(); // temporary until we add proper sessions
+                    try {
+                        const session_id = crypto.randomUUID(); // temporary until we add proper sessions
 
-                    // log user message
-                    await supabaseAdmin.from('conversations').insert({
-                        user_id: env.MY_USER_ID,
-                        session_id,
-                        channel: 'web',
-                        role: 'user',
-                        content: messages[messages.length - 1].content,
-                    });
+                        // log user message
+                        await supabaseAdmin.from('conversations').insert({
+                            user_id: env.MY_USER_ID,
+                            session_id,
+                            channel: 'web',
+                            role: 'user',
+                            content: messages[messages.length - 1].content,
+                        });
 
-                    // log assistant response  
-                    await supabaseAdmin.from('conversations').insert({
-                        user_id: env.MY_USER_ID,
-                        session_id,
-                        channel: 'web',
-                        role: 'assistant',
-                        content: text,
-                        tokens_used: usage.totalTokens,
-                    });
+                        // log assistant response  
+                        await supabaseAdmin.from('conversations').insert({
+                            user_id: env.MY_USER_ID,
+                            session_id,
+                            channel: 'web',
+                            role: 'assistant',
+                            content: text,
+                            tokens_used: usage.totalTokens,
+                        });
 
-                    // Fire quality scoring in background
-                    await inngest.send({
-                        name: 'solus/response.generated',
-                        data: {
-                            userMessage: messages[messages.length - 1]?.content ?? '',
-                            assistantResponse: text,
-                            sessionId: session_id,
-                        },
-                    })
+                        // Fire quality scoring in background
+                        await inngest.send({
+                            name: 'solus/response.generated',
+                            data: {
+                                userMessage: messages[messages.length - 1]?.content ?? '',
+                                assistantResponse: text,
+                                sessionId: session_id,
+                            },
+                        })
 
-                    // background memory extraction
-                    await inngest.send({
-                        name: "solus/turn.completed",
-                        data: {
-                            userMessage: messages[messages.length - 1].content,
-                            assistantResponse: text,
-                            userId: env.MY_USER_ID,
-                        },
-                    });
-                } catch (e) {
-                    console.error("onFinish error:", e);
-                } finally {
-                    data.close();
+                        // background memory extraction
+                        await inngest.send({
+                            name: "solus/turn.completed",
+                            data: {
+                                userMessage: messages[messages.length - 1].content,
+                                assistantResponse: text,
+                                userId: env.MY_USER_ID,
+                            },
+                        });
+                    } catch (e) {
+                        console.error("onFinish error:", e);
+                    } finally {
+                        data.close();
+                    }
+                },
+            });
+
+            return result.toDataStreamResponse({
+                data,
+                headers: {
+                    'X-RateLimit-Limit': String(limit),
+                    'X-RateLimit-Remaining': String(remaining),
+                    'X-RateLimit-Reset': String(reset),
+                },
+            });
+        } catch (error) {
+            const { isProviderError: isProvErr, provider, reason } = isProviderError(error);
+            if (isProvErr && provider) {
+                await markProviderDown(provider, reason);
+                // Retry with Gemini if Groq failed
+                if (provider === 'groq' && env.GOOGLE_GEMINI_API_KEY) {
+                    try {
+                        const fallbackModel = getProviderModel('gemini', 'reasoning');
+                        const result = streamText({
+                            model: fallbackModel as any,
+                            system: systemPrompt,
+                            messages,
+                            tools,
+                            maxSteps: 5,
+                            onFinish: async () => { data.close() },
+                        });
+                        return result.toDataStreamResponse({ data });
+                    } catch (fallbackError) {
+                        data.close();
+                        return Response.json({ error: getErrorMessage(fallbackError) }, { status: 500 });
+                    }
                 }
-            },
-        });
-
-        return result.toDataStreamResponse({
-            data,
-            headers: {
-                'X-RateLimit-Limit': String(limit),
-                'X-RateLimit-Remaining': String(remaining),
-                'X-RateLimit-Reset': String(reset),
-            },
-        });
+            }
+            throw error;
+        }
     } catch (error) {
         console.error("Chat route catastrophic error:", error);
         
-        const message = error instanceof Error ? error.message.toLowerCase() : '';
-        if (message.includes('rate_limit') || message.includes('429') || message.includes('quota')) {
-            await markGroqLimited();
-        }
-
         data.close();
         // Return a valid stream with error message so the UI doesn't hang
         return new Response(
