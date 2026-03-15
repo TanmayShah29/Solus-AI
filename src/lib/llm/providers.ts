@@ -4,6 +4,9 @@ import { env } from '@/lib/env'
 import { redis } from '@/lib/redis/client'
 
 const groq = createGroq({ apiKey: env.GROQ_API_KEY })
+console.log('[Providers] Gemini API key present in process.env:', !!process.env.GOOGLE_GEMINI_API_KEY)
+console.log('[Providers] env.GOOGLE_GEMINI_API_KEY present:', !!env.GOOGLE_GEMINI_API_KEY)
+
 export const google = env.GOOGLE_GEMINI_API_KEY
   ? createGoogleGenerativeAI({ apiKey: env.GOOGLE_GEMINI_API_KEY })
   : null

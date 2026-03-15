@@ -3,6 +3,7 @@ import { env } from '@/lib/env'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { groq, REASONING_MODEL } from '@/lib/groq/client'
 import { generateText } from 'ai'
+import { redis } from '@/lib/redis/client'
 
 async function sendTelegram(message: string): Promise<void> {
   await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -48,9 +49,16 @@ export const proactiveMonitor = inngest.createFunction(
           }),
         })
         const data = await res.json()
-        if (data.success && data.result?.length > 0) {
+
+        // Before sending the email notification, check if we already sent this recently
+        const emailDedupeKey = `proactive:emails:${new Date().toDateString()}`
+        const alreadySent = await redis.get(emailDedupeKey)
+
+        if (!alreadySent && data.success && data.result?.length > 0) {
           const subjects = data.result.map((e: any) => `"${e.subject}"`).join(', ')
           await sendTelegram(`Unread: ${subjects}`)
+          // Mark as sent for today
+          await redis.set(emailDedupeKey, '1', { ex: 86400 })
         }
       } catch {
         // best effort
