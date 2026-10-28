@@ -64,11 +64,14 @@ git clone https://github.com/TanmayShah29/Solus-AI.git
 cd Solus-AI
 npm install
 # create .env.local with the variables listed in src/lib/env.ts
+# GITHUB_REPO must point at a PRIVATE repo: that's where memory.md is kept
 npm run dev                  # starts Next.js and the Inngest dev server together
 npm run register-webhook     # points your Telegram bot at the app
 ```
 
 Then open `/api/auth/google` once to connect your Google account.
+
+**Access:** every page and API route sits behind one login (`src/proxy.ts`). Your browser asks for `SOLUS_DASHBOARD_PASSWORD` the first time, and server-to-server calls use `API_SECRET_TOKEN`. The secret never reaches the browser. Only the Telegram and Inngest webhooks skip the gate, because they verify their own signatures.
 
 ## Status
 

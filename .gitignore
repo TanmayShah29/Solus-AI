@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Personal memory lives in a private repo (GITHUB_REPO), never here
+memory.md
+user.md
+*.log

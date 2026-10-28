@@ -18,9 +18,7 @@ export default function PeoplePage() {
 
   useEffect(() => {
     async function load() {
-      const res = await fetch('/api/dashboard/people', {
-        headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` }
-      })
+      const res = await fetch('/api/dashboard/people')
       if (res.ok) {
         const data = await res.json()
         setPeople(data.people ?? [])

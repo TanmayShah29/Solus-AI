@@ -27,9 +27,7 @@ export default function ToolsPage() {
 
   useEffect(() => {
     async function load() {
-      const res = await fetch('/api/dashboard/tools', {
-        headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` }
-      })
+      const res = await fetch('/api/dashboard/tools')
       if (res.ok) {
         const data = await res.json()
         setTools(data.tools ?? [])
@@ -37,9 +35,7 @@ export default function ToolsPage() {
 
       // Fetch telemetry
       try {
-        const res = await fetch('/api/telemetry', {
-          headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` },
-        })
+        const res = await fetch('/api/telemetry')
         if (res.ok) {
           const telemetry = await res.json()
           setStats(telemetry.stats ?? [])

@@ -20,12 +20,8 @@ export default function Dashboard() {
   useEffect(() => {
     async function loadStats() {
       const [statsRes, statusRes] = await Promise.all([
-        fetch('/api/dashboard/stats', {
-          headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` }
-        }),
-        fetch('/api/llm-status', {
-          headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` }
-        }).then(r => r.json()).catch(() => null)
+        fetch('/api/dashboard/stats'),
+        fetch('/api/llm-status').then(r => r.json()).catch(() => null)
       ])
 
       if (statsRes.ok) {

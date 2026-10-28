@@ -26,9 +26,7 @@ export default function MemoryPage() {
 
   useEffect(() => {
     async function load() {
-      const res = await fetch('/api/dashboard/memory', {
-        headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_TOKEN}` }
-      })
+      const res = await fetch('/api/dashboard/memory')
       if (res.ok) {
         const data = await res.json()
         setMemories(data.memories ?? [])
